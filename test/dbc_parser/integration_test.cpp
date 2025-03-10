@@ -1,6 +1,7 @@
 #include "dbc_parser/parser.h"
 #include "dbc_parser/decoder.h"
 #include "dbc_parser/types.h"
+#include "dbc_parser/signal_decoder.h"
 
 #include <gtest/gtest.h>
 #include <string>
@@ -79,11 +80,11 @@ TEST_F(IntegrationTest, CompleteWorkflow) {
   
   // 2. Create a decoder
   DecoderOptions decoder_options;
-  Decoder decoder(std::make_shared<Database>(*db), decoder_options);
+  Decoder decoder(*db, decoder_options);
   
   // 3. Create some CAN frame data manually
   // Engine data: Speed=1000rpm, Temp=80°C, Load=50%
-  std::vector<uint8_t> engine_data = {0xE8, 0x03, 0x78, 0x32};
+  std::vector<uint8_t> engine_data = {0xE8, 0x03, 0x78, 0x32, 0x00, 0x00, 0x00, 0x00};
   
   // 4. Decode the engine data frame
   auto engine_result = decoder.decode_frame(100, engine_data);
@@ -104,7 +105,7 @@ TEST_F(IntegrationTest, CompleteWorkflow) {
   EXPECT_EQ("%", engine_result->signals["EngineLoad"].unit);
   
   // 6. Transmission data with mode 1 (Sport): Gear=3, Mode=1, Temp=60°C, Speed=1000rpm, Pressure=100kPa
-  std::vector<uint8_t> trans_data = {0x13, 0x78, 0xE8, 0x03, 0x64};
+  std::vector<uint8_t> trans_data = {0x13, 0x78, 0xE8, 0x03, 0x64, 0x00, 0x00, 0x00};
   
   // 7. Decode the transmission data frame
   auto trans_result = decoder.decode_frame(200, trans_data);
@@ -158,20 +159,24 @@ TEST_F(IntegrationTest, CompleteWorkflow) {
   
   // Add a message
   auto new_msg = std::make_unique<Message>(300, "NewMessage", 8, "ECU1");
-  auto msg_ptr = new_db->add_message(std::move(new_msg));
+  new_db->add_message(std::move(new_msg));
+  Message* msg_ptr = new_db->get_message(300);
   ASSERT_NE(nullptr, msg_ptr);
   
   // Add a signal
   auto new_signal = std::make_unique<Signal>("NewSignal", 0, 8, true, false, 1.0, 0.0, 0.0, 255.0, "");
-  auto signal_ptr = msg_ptr->add_signal(std::move(new_signal));
+  msg_ptr->add_signal(std::move(new_signal));
+  Signal* signal_ptr = msg_ptr->get_signal("NewSignal");
   ASSERT_NE(nullptr, signal_ptr);
   
   // Create sample data and encode a value
   std::vector<uint8_t> new_data(8, 0);
-  signal_ptr->encode(123.0, new_data);
+  SignalDecoder::encode(123.0, new_data, signal_ptr->start_bit(), signal_ptr->length(),
+                       signal_ptr->is_little_endian(), signal_ptr->is_signed(),
+                       signal_ptr->factor(), signal_ptr->offset());
   
   // Create a decoder for the new database
-  Decoder new_decoder(std::make_shared<Database>(*new_db), decoder_options);
+  Decoder new_decoder(*new_db, decoder_options);
   
   // Decode the frame and verify
   auto new_result = new_decoder.decode_frame(300, new_data);

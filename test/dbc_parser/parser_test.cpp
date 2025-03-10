@@ -240,7 +240,7 @@ TEST_F(DbcParserTest, DecodeFrame) {
   Decoder decoder(*db, decoder_options);
   
   // Test decoding engine data
-  std::vector<uint8_t> engine_data = {0xE8, 0x03, 0x50, 0x40};  // 1000 rpm, 80C, 64%
+  std::vector<uint8_t> engine_data = {0xE8, 0x03, 0x50, 0x40, 0x00, 0x00, 0x00, 0x00};  // 1000 rpm, 80C, 64%
   auto decoded_engine = decoder.decode_frame(100, engine_data);
   ASSERT_TRUE(decoded_engine);
   EXPECT_EQ("EngineData", decoded_engine->name);
@@ -291,7 +291,7 @@ TEST_F(DbcParserTest, DecodeSignal) {
   Decoder decoder(*db, decoder_options);
   
   // Test decoding engine speed from engine data
-  std::vector<uint8_t> engine_data = {0xE8, 0x03, 0x50, 0x40};  // 1000 rpm, 80C, 64%
+  std::vector<uint8_t> engine_data = {0xE8, 0x03, 0x50, 0x40, 0x00, 0x00, 0x00, 0x00};  // 1000 rpm, 80C, 64%
   auto engine_speed = decoder.decode_signal(100, "EngineSpeed", engine_data);
   ASSERT_TRUE(engine_speed);
   EXPECT_EQ("EngineSpeed", engine_speed->name);
