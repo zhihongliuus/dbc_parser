@@ -53,4 +53,13 @@ cc_test(
         "@googletest//:gtest_main",
     ],
     data = [":sample_files"],
+)
+
+cc_test(
+    name = "dbc_types_test",
+    srcs = ["dbc_types_test.cpp"],
+    deps = [
+        "//:dbc_parser",
+        "@googletest//:gtest_main",
+    ],
 ) 
