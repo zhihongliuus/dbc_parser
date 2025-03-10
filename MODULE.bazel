@@ -1,0 +1,18 @@
+module(
+    name = "dbc_parser",
+    version = "0.1.0",
+)
+
+# Using specific Boost component dependencies instead of the general boost module
+bazel_dep(name = "boost.spirit", version = "1.83.0")
+bazel_dep(name = "boost.fusion", version = "1.83.0")
+bazel_dep(name = "boost.variant", version = "1.83.0")
+bazel_dep(name = "boost.optional", version = "1.83.0")
+bazel_dep(name = "boost.phoenix", version = "1.83.0")
+bazel_dep(name = "boost.filesystem", version = "1.83.0")
+bazel_dep(name = "boost.program_options", version = "1.83.0")
+bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
+bazel_dep(name = "rules_cc", version = "0.0.17")
+
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure")
+use_repo(cc_configure, "local_config_cc") 

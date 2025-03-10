@@ -1,0 +1,14 @@
+# Enable Bzlmod
+common --enable_bzlmod
+
+# Build options
+build --cxxopt='-std=c++17'
+build --host_cxxopt='-std=c++17'
+build:opt --copt=-O3
+build:opt --copt=-march=native
+
+# Test options
+test --test_output=errors
+
+# Use remote cache if specified
+build:remote --remote_cache=grpc://localhost:9092 
