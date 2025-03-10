@@ -43,7 +43,8 @@ public:
                   << ": expected " << message->length() << " bytes, got "
                   << data.size() << std::endl;
       }
-      // Still try to decode what we can
+      // Return nullopt when data is too short
+      return std::nullopt;
     }
     
     DecodedMessage result;
@@ -158,7 +159,8 @@ public:
                   << ": expected " << message->length() << " bytes, got "
                   << data.size() << std::endl;
       }
-      // Still try to decode what we can
+      // Return nullopt when data is too short
+      return std::nullopt;
     }
     
     // Handle multiplexed signals
