@@ -1,97 +1,196 @@
 #ifndef DBC_PARSER_TYPES_H_
 #define DBC_PARSER_TYPES_H_
 
-#include <cstdint>
-#include <map>
-#include <memory>
 #include <string>
 #include <vector>
-#include <optional>
+#include <memory>
+#include <map>
+#include <cstdint>
+#include <unordered_map>
 
 namespace dbc_parser {
 
-// Basic type definitions
-using MessageId = uint32_t;
-using SignalId = uint32_t;
-using NodeId = uint32_t;
-using AttributeId = uint32_t;
-
 // Forward declarations
-class Signal;
-class Message;
 class Node;
-class Database;
-class ValueTable;
-class Attribute;
-class AttributeDefinition;
-class EnvironmentVariable;
-class SignalType;
+class Message;
+class Signal;
 class SignalGroup;
 
-// Multiplexer types
+// Type definitions
+using MessageId = uint32_t;
+
+// Enumerations
 enum class MultiplexerType {
   kNone,
   kMultiplexor,
   kMultiplexed
 };
 
-// Signal extended value type
 enum class SignalExtendedValueType {
   kNone,
-  kInteger,
   kFloat,
   kDouble
 };
 
-// Attribute type
 enum class AttributeType {
-  kInteger,
+  kInt,
   kFloat,
   kString,
   kEnum
 };
 
-// Signal class
+// Database class to represent a DBC file
+class Database {
+public:
+  Database() = default;
+  ~Database() = default;
+  
+  // Delete copy constructor and assignment operator
+  Database(const Database&) = delete;
+  Database& operator=(const Database&) = delete;
+
+  struct Version {
+    std::string version;
+  };
+
+  struct BitTiming {
+    uint32_t baudrate = 0;
+    uint32_t btr1 = 0;
+    uint32_t btr2 = 0;
+  };
+
+  // Accessors for version
+  void set_version(const Version& version) { version_ = version; }
+  const Version* version() const { return &version_; }
+
+  // Accessors for bit timing
+  void set_bit_timing(const BitTiming& bit_timing) { bit_timing_ = bit_timing; }
+  const BitTiming* bit_timing() const { return &bit_timing_; }
+
+  // Node management
+  void add_node(std::unique_ptr<Node> node);
+  const std::vector<std::unique_ptr<Node>>& nodes() const { return nodes_; }
+  Node* get_node(const std::string& name) const;
+  void set_node_comment(const std::string& node_name, const std::string& comment);
+
+  // Message management
+  void add_message(std::unique_ptr<Message> message);
+  const std::vector<std::unique_ptr<Message>>& messages() const { return messages_; }
+  Message* get_message(MessageId id) const;
+
+private:
+  Version version_;
+  BitTiming bit_timing_;
+  std::vector<std::unique_ptr<Node>> nodes_;
+  std::vector<std::unique_ptr<Message>> messages_;
+  std::map<std::string, std::string> node_comments_;
+};
+
+// Node class for ECU/node definitions
+class Node {
+public:
+  explicit Node(const std::string& name) : name_(name) {}
+  ~Node() = default;
+
+  const std::string& name() const { return name_; }
+  void set_comment(const std::string& comment) { comment_ = comment; }
+  const std::string& comment() const { return comment_; }
+
+private:
+  std::string name_;
+  std::string comment_;
+};
+
+// Message class for CAN message definitions
+class Message {
+public:
+  Message(MessageId id, const std::string& name, uint32_t length, const std::string& sender)
+    : id_(id), name_(name), length_(length), sender_(sender) {}
+  ~Message() = default;
+
+  MessageId id() const { return id_; }
+  const std::string& name() const { return name_; }
+  uint32_t length() const { return length_; }
+  const std::string& sender() const { return sender_; }
+
+  // Signal management
+  void add_signal(std::unique_ptr<Signal> signal);
+  const std::unordered_map<std::string, std::unique_ptr<Signal>>& signals() const { return signals_; }
+  Signal* get_signal(const std::string& name) const;
+
+  // Comment
+  void set_comment(const std::string& comment) { comment_ = comment; }
+  const std::string& comment() const { return comment_; }
+
+  // Transmitters
+  void add_transmitter(const std::string& transmitter) { transmitters_.push_back(transmitter); }
+  const std::vector<std::string>& transmitters() const { return transmitters_; }
+
+  // Signal groups
+  void add_signal_group(std::unique_ptr<SignalGroup> group);
+  const std::vector<std::unique_ptr<SignalGroup>>& signal_groups() const { return signal_groups_; }
+
+private:
+  MessageId id_;
+  std::string name_;
+  uint32_t length_;
+  std::string sender_;
+  std::unordered_map<std::string, std::unique_ptr<Signal>> signals_;
+  std::string comment_;
+  std::vector<std::string> transmitters_;
+  std::vector<std::unique_ptr<SignalGroup>> signal_groups_;
+};
+
+// Signal class for CAN signal definitions
 class Signal {
- public:
+public:
   Signal(const std::string& name, uint32_t start_bit, uint32_t length,
          bool is_little_endian, bool is_signed, double factor, double offset,
-         double min_value, double max_value, const std::string& unit);
-  
-  // Getters
-  const std::string& name() const;
-  uint32_t start_bit() const;
-  uint32_t length() const;
-  bool is_little_endian() const;
-  bool is_signed() const;
-  double factor() const;
-  double offset() const;
-  double min_value() const;
-  double max_value() const;
-  const std::string& unit() const;
-  const std::string& comment() const;
-  MultiplexerType mux_type() const;
-  uint32_t mux_value() const;
-  const std::vector<std::string>& receivers() const;
-  const std::map<uint64_t, std::string>& value_descriptions() const;
-  
-  // Setters
-  void set_comment(const std::string& comment);
-  void set_mux_type(MultiplexerType type);
-  void set_mux_value(uint32_t value);
-  void set_factor(double factor);
-  void set_offset(double offset);
-  
-  // Modifiers
-  void add_receiver(const std::string& receiver);
-  void add_value_description(uint64_t value, const std::string& description);
-  void set_attribute(const std::string& name, const Attribute& attribute);
-  
-  // Signal operations
-  double decode(const std::vector<uint8_t>& data) const;
-  void encode(double value, std::vector<uint8_t>& data) const;
-  
- private:
+         double min_value, double max_value, const std::string& unit)
+    : name_(name), start_bit_(start_bit), length_(length),
+      is_little_endian_(is_little_endian), is_signed_(is_signed),
+      factor_(factor), offset_(offset), min_value_(min_value), max_value_(max_value),
+      unit_(unit), mux_type_(MultiplexerType::kNone), mux_value_(0),
+      extended_value_type_(SignalExtendedValueType::kNone) {}
+  ~Signal() = default;
+
+  const std::string& name() const { return name_; }
+  uint32_t start_bit() const { return start_bit_; }
+  uint32_t length() const { return length_; }
+  bool is_little_endian() const { return is_little_endian_; }
+  bool is_signed() const { return is_signed_; }
+  double factor() const { return factor_; }
+  double offset() const { return offset_; }
+  double min_value() const { return min_value_; }
+  double max_value() const { return max_value_; }
+  const std::string& unit() const { return unit_; }
+
+  // Receivers
+  void add_receiver(const std::string& receiver) { receivers_.push_back(receiver); }
+  const std::vector<std::string>& receivers() const { return receivers_; }
+
+  // Multiplexing
+  void set_mux_type(MultiplexerType type) { mux_type_ = type; }
+  MultiplexerType mux_type() const { return mux_type_; }
+
+  void set_mux_value(uint32_t value) { mux_value_ = value; }
+  uint32_t mux_value() const { return mux_value_; }
+
+  // Value descriptions (enum values)
+  void add_value_description(int64_t value, const std::string& description) {
+    value_descriptions_[value] = description;
+  }
+  const std::map<int64_t, std::string>& value_descriptions() const { return value_descriptions_; }
+
+  // Comment
+  void set_comment(const std::string& comment) { comment_ = comment; }
+  const std::string& comment() const { return comment_; }
+
+  // Extended value type
+  void set_extended_value_type(SignalExtendedValueType type) { extended_value_type_ = type; }
+  SignalExtendedValueType extended_value_type() const { return extended_value_type_; }
+
+private:
   std::string name_;
   uint32_t start_bit_;
   uint32_t length_;
@@ -102,239 +201,88 @@ class Signal {
   double min_value_;
   double max_value_;
   std::string unit_;
-  std::string comment_;
+  std::vector<std::string> receivers_;
   MultiplexerType mux_type_;
   uint32_t mux_value_;
-  std::vector<std::string> receivers_;
-  std::map<uint64_t, std::string> value_descriptions_;
-  std::map<std::string, Attribute> attributes_;
-};
-
-// Message class
-class Message {
- public:
-  Message(MessageId id, const std::string& name, uint32_t length, const std::string& sender);
-  
-  // Copy constructor to handle unique_ptr members
-  Message(const Message& other);
-  
-  // Getters
-  MessageId id() const;
-  const std::string& name() const;
-  uint32_t length() const;
-  const std::string& sender() const;
-  const std::string& comment() const;
-  const std::map<std::string, std::unique_ptr<Signal>>& signals() const;
-  const std::vector<std::string>& transmitters() const;
-  
-  // Setters
-  void set_comment(const std::string& comment);
-  
-  // Modifiers
-  Signal* add_signal(std::unique_ptr<Signal> signal);
-  Signal* get_signal(const std::string& name) const;
-  bool remove_signal(const std::string& name);
-  void set_attribute(const std::string& name, const Attribute& attribute);
-  void add_transmitter(const std::string& transmitter);
-  void add_signal_group(std::unique_ptr<SignalGroup> group);
-  
-  // Message operations
-  std::map<std::string, double> decode(const std::vector<uint8_t>& data) const;
- 
- private:
-  MessageId id_;
-  std::string name_;
-  uint32_t length_;
-  std::string sender_;
+  std::map<int64_t, std::string> value_descriptions_;
   std::string comment_;
-  std::map<std::string, std::unique_ptr<Signal>> signals_;
-  std::vector<std::string> transmitters_;
-  std::map<std::string, std::unique_ptr<SignalGroup>> signal_groups_;
-  std::map<std::string, Attribute> attributes_;
+  SignalExtendedValueType extended_value_type_;
 };
 
-// Node class
-class Node {
- public:
-  explicit Node(const std::string& name);
-  
-  // Getters
-  const std::string& name() const;
-  const std::string& comment() const;
-  
-  // Setters
-  void set_comment(const std::string& comment);
-  
-  // Modifiers
-  void set_attribute(const std::string& name, const Attribute& attribute);
-
- private:
-  std::string name_;
-  std::string comment_;
-  std::map<std::string, Attribute> attributes_;
-};
-
-// Value table class
-class ValueTable {
- public:
-  explicit ValueTable(const std::string& name);
-  
-  // Getters
-  const std::string& name() const;
-  const std::map<uint64_t, std::string>& entries() const;
-  
-  // Modifiers
-  void add_entry(uint64_t value, const std::string& description);
-
- private:
-  std::string name_;
-  std::map<uint64_t, std::string> entries_;
-};
-
-// Attribute class
-class Attribute {
- public:
-  Attribute() = default;
-  Attribute(const std::string& name, const std::string& value);
-  
-  // Getters
-  const std::string& name() const;
-  const std::string& value() const;
-  
-  // Setters
-  void set_value(const std::string& value);
-
- private:
-  std::string name_;
-  std::string value_;
-};
-
-// Signal Group class
+// SignalGroup class for signal group definitions
 class SignalGroup {
- public:
-  SignalGroup(const std::string& name, uint32_t id);
-  
-  // Getters
-  const std::string& name() const;
-  uint32_t id() const;
-  
-  // Modifiers
-  void add_signal(const std::string& signal_name);
+public:
+  SignalGroup(MessageId message_id, const std::string& name, uint32_t id)
+    : message_id_(message_id), name_(name), id_(id) {}
+  ~SignalGroup() = default;
 
- private:
+  MessageId message_id() const { return message_id_; }
+  const std::string& name() const { return name_; }
+  uint32_t id() const { return id_; }
+
+  void add_signal(const std::string& signal_name) { signals_.push_back(signal_name); }
+  const std::vector<std::string>& signals() const { return signals_; }
+
+private:
+  MessageId message_id_;
   std::string name_;
   uint32_t id_;
   std::vector<std::string> signals_;
 };
 
-// Environment Variable class
-class EnvironmentVariable {
- public:
-  EnvironmentVariable(const std::string& name, uint32_t type, double min, double max);
-  
-  // Getters
-  const std::string& name() const;
-  uint32_t type() const;
-  double min() const;
-  double max() const;
+// Implement Database methods
+inline void Database::add_node(std::unique_ptr<Node> node) {
+  nodes_.push_back(std::move(node));
+}
 
- private:
-  std::string name_;
-  uint32_t type_;
-  double min_;
-  double max_;
-};
+inline Node* Database::get_node(const std::string& name) const {
+  for (const auto& node : nodes_) {
+    if (node->name() == name) {
+      return node.get();
+    }
+  }
+  return nullptr;
+}
 
-// Signal Type class
-class SignalType {
- public:
-  SignalType(const std::string& name);
-  
-  // Getters
-  const std::string& name() const;
+inline void Database::set_node_comment(const std::string& node_name, const std::string& comment) {
+  node_comments_[node_name] = comment;
+  auto node = get_node(node_name);
+  if (node) {
+    node->set_comment(comment);
+  }
+}
 
- private:
-  std::string name_;
-};
+inline void Database::add_message(std::unique_ptr<Message> message) {
+  messages_.push_back(std::move(message));
+}
 
-// Attribute Definition class
-class AttributeDefinition {
- public:
-  enum class Type {
-    kInteger,
-    kFloat,
-    kString,
-    kEnum
-  };
-  
-  AttributeDefinition(const std::string& name, Type type);
-  
-  // Getters
-  const std::string& name() const;
-  Type type() const;
+inline Message* Database::get_message(MessageId id) const {
+  for (const auto& message : messages_) {
+    if (message->id() == id) {
+      return message.get();
+    }
+  }
+  return nullptr;
+}
 
- private:
-  std::string name_;
-  Type type_;
-};
+// Implement Message methods
+inline void Message::add_signal(std::unique_ptr<Signal> signal) {
+  std::string name = signal->name();
+  signals_[name] = std::move(signal);
+}
 
-// Database class
-class Database {
- public:
-  // Version information
-  struct Version {
-    std::string version;
-  };
-  
-  // Bit timing information
-  struct BitTiming {
-    uint32_t baudrate;
-    uint32_t btr1;
-    uint32_t btr2;
-  };
-  
-  Database();
-  Database(const Database& other);
-  
-  // Getters
-  const std::optional<Version>& version() const;
-  const std::optional<BitTiming>& bit_timing() const;
-  const std::map<std::string, std::unique_ptr<Node>>& nodes() const;
-  const std::map<std::string, std::unique_ptr<ValueTable>>& value_tables() const;
-  const std::map<MessageId, std::unique_ptr<Message>>& messages() const;
-  const std::map<std::string, std::unique_ptr<EnvironmentVariable>>& environment_variables() const;
-  const std::map<std::string, std::unique_ptr<SignalType>>& signal_types() const;
-  const std::map<std::string, std::unique_ptr<AttributeDefinition>>& attribute_definitions() const;
-  
-  // Setters
-  void set_version(const Version& version);
-  void set_bit_timing(const BitTiming& bit_timing);
-  
-  // Modifiers
-  Node* add_node(std::unique_ptr<Node> node);
-  Node* get_node(const std::string& name) const;
-  ValueTable* add_value_table(std::unique_ptr<ValueTable> table);
-  Message* add_message(std::unique_ptr<Message> message);
-  Message* get_message(MessageId id) const;
-  bool remove_message(MessageId id);
-  EnvironmentVariable* add_env_var(std::unique_ptr<EnvironmentVariable> env_var);
-  SignalType* add_signal_type(std::unique_ptr<SignalType> signal_type);
-  AttributeDefinition* add_attribute_definition(std::unique_ptr<AttributeDefinition> def);
-  
-  // Database operations
-  std::map<std::string, double> decode_message(MessageId id, const std::vector<uint8_t>& data) const;
+inline Signal* Message::get_signal(const std::string& name) const {
+  auto it = signals_.find(name);
+  if (it != signals_.end()) {
+    return it->second.get();
+  }
+  return nullptr;
+}
 
- private:
-  std::optional<Version> version_;
-  std::optional<BitTiming> bit_timing_;
-  std::map<std::string, std::unique_ptr<Node>> nodes_;
-  std::map<std::string, std::unique_ptr<ValueTable>> value_tables_;
-  std::map<MessageId, std::unique_ptr<Message>> messages_;
-  std::map<std::string, std::unique_ptr<EnvironmentVariable>> env_vars_;
-  std::map<std::string, std::unique_ptr<SignalType>> signal_types_;
-  std::map<std::string, std::unique_ptr<AttributeDefinition>> attribute_defs_;
-};
+inline void Message::add_signal_group(std::unique_ptr<SignalGroup> group) {
+  signal_groups_.push_back(std::move(group));
+}
 
 } // namespace dbc_parser
 
-#endif // DBC_PARSER_TYPES_H_ 
+#endif // DBC_PARSER_TYPES_H_

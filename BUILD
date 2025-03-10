@@ -8,7 +8,10 @@ cc_library(
         [
             "src/**/*.cpp",
         ],
-        # No exclusions after fixing Boost macro issues
+        exclude = [
+            "src/dbc_parser/dbc_grammar.cpp",
+            "src/dbc_parser/dbc_parser.cpp",
+        ],
     ),
     hdrs = glob(["include/**/*.h"]),
     copts = [
@@ -36,6 +39,12 @@ cc_test(
 cc_binary(
     name = "dbc_parser_cli",
     srcs = ["tools/dbc_parser_cli.cpp"],
+    copts = [
+        "-std=c++17",
+    ],
+    linkopts = [
+        "-lboost_program_options",
+    ],
     deps = [
         ":dbc_parser",
     ],

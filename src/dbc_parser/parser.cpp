@@ -1,10 +1,11 @@
 #include "dbc_parser/parser.h"
+#include "dbc_parser/dbc_grammar.h"
 #include "dbc_parser/types.h"
 
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-#include <algorithm>
+#include <filesystem>
 
 namespace dbc_parser {
 
@@ -14,6 +15,11 @@ public:
   
   std::unique_ptr<Database> parse_file(const std::string& filename, const ParserOptions& options) {
     // Check if file exists
+    if (!std::filesystem::exists(filename)) {
+      throw std::runtime_error("File not found: " + filename);
+    }
+    
+    // Read file content
     std::ifstream file(filename);
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open file: " + filename);
@@ -225,8 +231,7 @@ public:
          << message->length() << " " << message->sender() << "\n";
       
       // Write signals
-      for (const auto& signal_pair : message->signals()) {
-        const auto& signal = signal_pair.second;
+      for (const auto& [name, signal] : message->signals()) {
         ss << " SG_ " << signal->name() << " ";
         
         // Handle multiplexing
@@ -265,8 +270,7 @@ public:
       }
       
       // Write signal comments
-      for (const auto& signal_pair : message->signals()) {
-        const auto& signal = signal_pair.second;
+      for (const auto& [name, signal] : message->signals()) {
         if (!signal->comment().empty()) {
           ss << "CM_ SG_ " << message->id() << " " << signal->name() 
              << " \"" << signal->comment() << "\";\n";
@@ -285,13 +289,12 @@ public:
     
     // Write value descriptions
     for (const auto& message : db.messages()) {
-      for (const auto& signal_pair : message->signals()) {
-        const auto& signal = signal_pair.second;
+      for (const auto& [name, signal] : message->signals()) {
         const auto& value_descs = signal->value_descriptions();
         if (!value_descs.empty()) {
           ss << "VAL_ " << message->id() << " " << signal->name();
-          for (const auto& value_desc : value_descs) {
-            ss << " " << value_desc.first << " \"" << value_desc.second << "\"";
+          for (const auto& [value, desc] : value_descs) {
+            ss << " " << value << " \"" << desc << "\"";
           }
           ss << ";\n";
         }
@@ -324,12 +327,7 @@ std::string DbcParser::write_string(const Database& db) {
 // ParserFactory implementation
 std::unique_ptr<DbcParser> ParserFactory::create_parser(const std::string& filename) {
   // Get file extension
-  size_t dot_pos = filename.find_last_of(".");
-  if (dot_pos == std::string::npos) {
-    throw std::runtime_error("File has no extension: " + filename);
-  }
-  
-  std::string extension = filename.substr(dot_pos + 1);
+  std::string extension = filename.substr(filename.find_last_of(".") + 1);
   
   // Convert to lowercase
   std::transform(extension.begin(), extension.end(), extension.begin(),

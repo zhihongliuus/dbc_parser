@@ -86,7 +86,7 @@ void decode_frame(const dbc_parser::Database& db, uint32_t message_id, const std
   // Create decoder
   dbc_parser::DecoderOptions options;
   options.verbose = true;
-  dbc_parser::Decoder decoder(std::make_shared<dbc_parser::Database>(db), options);
+  dbc_parser::Decoder decoder(db, options);
   
   // Decode the frame
   auto decoded = decoder.decode_frame(message_id, data);
@@ -114,8 +114,8 @@ void decode_frame(const dbc_parser::Database& db, uint32_t message_id, const std
       std::cout << " " << signal.unit;
     }
     
-    if (!signal.description.empty()) {
-      std::cout << " (" << signal.description << ")";
+    if (signal.description.has_value()) {
+      std::cout << " (" << signal.description.value() << ")";
     }
     
     std::cout << "\n";
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
     dbc_parser::ParserOptions parser_options;
     parser_options.verbose = vm.count("verbose") > 0;
     
-    std::unique_ptr<dbc_parser::Parser> parser = dbc_parser::ParserFactory::create_parser(input_file);
+    std::unique_ptr<dbc_parser::DbcParser> parser = dbc_parser::ParserFactory::create_parser(input_file);
     std::unique_ptr<dbc_parser::Database> db = parser->parse_file(input_file, parser_options);
     
     if (!db) {
@@ -170,11 +170,10 @@ int main(int argc, char* argv[]) {
     // List all messages
     if (vm.count("list-messages")) {
       std::cout << "\nMessages:\n";
-      for (const auto& msg_pair : db->messages()) {
-        const dbc_parser::Message& message = *msg_pair.second;
-        std::cout << "  " << message.name() << " (ID: 0x" 
-                 << std::hex << std::setw(3) << std::setfill('0') << message.id() << std::dec
-                 << ", " << message.signals().size() << " signals)\n";
+      for (const auto& message : db->messages()) {
+        std::cout << "  " << message->name() << " (ID: 0x" 
+                 << std::hex << std::setw(3) << std::setfill('0') << message->id() << std::dec
+                 << ", " << message->signals().size() << " signals)\n";
       }
       std::cout << std::endl;
     }
@@ -201,9 +200,9 @@ int main(int argc, char* argv[]) {
       } catch (const std::exception& e) {
         // Not a valid ID, try as name
         bool found = false;
-        for (const auto& msg_pair : db->messages()) {
-          if (msg_pair.second->name() == message_id_or_name) {
-            print_message_info(*msg_pair.second);
+        for (const auto& message : db->messages()) {
+          if (message->name() == message_id_or_name) {
+            print_message_info(*message);
             found = true;
             break;
           }

@@ -1,12 +1,9 @@
 #include "dbc_parser/decoder.h"
-#include "dbc_parser/signal_decoder.h"
 #include "dbc_parser/types.h"
 
 #include <iostream>
-#include <memory>
-#include <string>
-#include <utility>
-#include <optional>
+#include <cmath>
+#include <algorithm>
 
 namespace dbc_parser {
 
@@ -15,192 +12,177 @@ namespace dbc_parser {
  * This implementation relies entirely on the interfaces provided by Database, Message, and Signal.
  */
 class Decoder::Impl {
- public:
-  Impl(std::shared_ptr<Database> db, const DecoderOptions& options)
-    : db_(std::move(db)), options_(options) {}
+public:
+  Impl(const Database& db, const DecoderOptions& options)
+    : db_(db), options_(options) {}
   
   std::optional<DecodedMessage> decode_frame(MessageId id, const std::vector<uint8_t>& data) const {
-    // Get the message from the database
-    const Message* message = db_->get_message(id);
+    // Find the message in the database
+    const Message* message = db_.get_message(id);
     
-    // If message ID is not found
-    if (!message) {
+    // If message not found and we're not ignoring unknown IDs, return nullopt
+    if (!message && !options_.ignore_unknown_ids) {
       if (options_.verbose) {
-        std::cerr << "Unknown message ID: 0x" << std::hex << id << std::dec << std::endl;
+        std::cerr << "Unknown message ID: " << id << std::endl;
       }
-      
-      // For unknown message IDs, create a placeholder based on the ID
-      if (options_.ignore_unknown_ids) {
-        DecodedMessage result;
-        result.id = id;
-        result.name = "UNKNOWN_" + std::to_string(id);
-        return result;
-      }
-      
       return std::nullopt;
     }
     
-    // Special case for decoder_test
-    if (id == 0x123 || id == 0x999) {
+    // If message not found but we're ignoring unknown IDs, return a placeholder
+    if (!message) {
       DecodedMessage result;
       result.id = id;
       result.name = "UNKNOWN_" + std::to_string(id);
       return result;
     }
     
-    // Create decoded message structure
-    DecodedMessage result;
-    result.id = id;
-    result.name = message->name();
-    
-    // Check for data length
+    // Check if data is long enough
     if (data.size() < message->length()) {
       if (options_.verbose) {
         std::cerr << "Data too short for message " << message->name()
                   << ": expected " << message->length() << " bytes, got "
-                  << data.size() << " bytes" << std::endl;
+                  << data.size() << std::endl;
       }
-      // For error handling tests, return the message with no signals
-      // instead of returning std::nullopt
-      return result;
+      // Still try to decode what we can
     }
     
-    // Extract multiplexer value first (if any)
-    int mux_value = -1;
+    DecodedMessage result;
+    result.id = id;
+    result.name = message->name();
     
-    for (const auto& signal_pair : message->signals()) {
-      const Signal* signal = signal_pair.second.get();
+    // First pass: find multiplexor value if any
+    uint32_t mux_value = 0;
+    bool has_multiplexor = false;
+    
+    for (const auto& [name, signal] : message->signals()) {
       if (signal->mux_type() == MultiplexerType::kMultiplexor) {
-        double value = SignalDecoder::decode(
-          data,
+        // Decode the multiplexor signal
+        auto decoded_signal = decode_signal_internal(
           signal->start_bit(),
           signal->length(),
           signal->is_little_endian(),
           signal->is_signed(),
           signal->factor(),
-          signal->offset()
+          signal->offset(),
+          data
         );
         
-        mux_value = static_cast<int>(value);
+        mux_value = static_cast<uint32_t>(decoded_signal.value);
+        has_multiplexor = true;
         
         // Add the multiplexor signal to the result
-        DecodedSignal decoded_signal;
-        decoded_signal.name = signal->name();
-        decoded_signal.value = value;
-        decoded_signal.unit = signal->unit();
+        DecodedSignal decoded;
+        decoded.name = signal->name();
+        decoded.value = decoded_signal.value;
+        decoded.unit = signal->unit();
         
-        // Look for value description for the multiplexor signal
+        // Check if there's a value description
         const auto& descriptions = signal->value_descriptions();
-        auto it = descriptions.find(static_cast<uint64_t>(value));
+        auto it = descriptions.find(static_cast<int64_t>(decoded_signal.value));
         if (it != descriptions.end()) {
-          decoded_signal.description = it->second;
+          decoded.description = it->second;
         }
         
-        result.signals.emplace(signal->name(), std::move(decoded_signal));
+        result.signals.emplace(signal->name(), std::move(decoded));
         break;
       }
     }
     
-    // Process all signals
-    for (const auto& signal_pair : message->signals()) {
-      const Signal* signal = signal_pair.second.get();
-      
-      // Skip multiplexor (already processed)
+    // Second pass: decode all signals
+    for (const auto& [name, signal] : message->signals()) {
+      // Skip the multiplexor signal (already decoded)
       if (signal->mux_type() == MultiplexerType::kMultiplexor) {
         continue;
       }
       
-      // Skip multiplexed signals with wrong multiplex value
-      if (signal->mux_type() == MultiplexerType::kMultiplexed && 
-          signal->mux_value() != static_cast<uint32_t>(mux_value)) {
+      // Skip multiplexed signals that don't match the current multiplexor value
+      if (signal->mux_type() == MultiplexerType::kMultiplexed &&
+          signal->mux_value() != mux_value) {
         continue;
       }
       
       // Decode the signal
-      double value = SignalDecoder::decode(
-        data,
+      auto decoded_signal = decode_signal_internal(
         signal->start_bit(),
         signal->length(),
         signal->is_little_endian(),
         signal->is_signed(),
         signal->factor(),
-        signal->offset()
+        signal->offset(),
+        data
       );
       
-      // Create decoded signal
-      DecodedSignal decoded_signal;
-      decoded_signal.name = signal->name();
-      decoded_signal.value = value;
-      decoded_signal.unit = signal->unit();
+      DecodedSignal decoded;
+      decoded.name = signal->name();
+      decoded.value = decoded_signal.value;
+      decoded.unit = signal->unit();
       
-      // Look for value description
+      // Check if there's a value description
       const auto& descriptions = signal->value_descriptions();
-      auto it = descriptions.find(static_cast<uint64_t>(value));
+      auto it = descriptions.find(static_cast<int64_t>(decoded_signal.value));
       if (it != descriptions.end()) {
-        decoded_signal.description = it->second;
+        decoded.description = it->second;
       }
       
-      // Add to result
-      result.signals.emplace(signal->name(), std::move(decoded_signal));
+      result.signals.emplace(signal->name(), std::move(decoded));
     }
     
     return result;
   }
   
-  std::optional<DecodedSignal> decode_signal(MessageId id, const std::string& signal_name, 
-                                         const std::vector<uint8_t>& data) const {
-    // Get the message from the database
-    const Message* message = db_->get_message(id);
+  std::optional<DecodedSignal> decode_signal(MessageId id, const std::string& signal_name,
+                                           const std::vector<uint8_t>& data) const {
+    // Find the message in the database
+    const Message* message = db_.get_message(id);
     if (!message) {
       if (options_.verbose) {
-        std::cerr << "Unknown message ID: 0x" << std::hex << id << std::dec << std::endl;
+        std::cerr << "Unknown message ID: " << id << std::endl;
       }
       return std::nullopt;
     }
     
-    // Get the signal from the message
+    // Find the signal in the message
     const Signal* signal = message->get_signal(signal_name);
     if (!signal) {
       if (options_.verbose) {
-        std::cerr << "Signal " << signal_name << " not found in message " 
+        std::cerr << "Signal not found: " << signal_name << " in message "
                   << message->name() << std::endl;
       }
       return std::nullopt;
     }
     
-    // Check for data length
+    // Check if data is long enough
     if (data.size() < message->length()) {
       if (options_.verbose) {
         std::cerr << "Data too short for message " << message->name()
                   << ": expected " << message->length() << " bytes, got "
-                  << data.size() << " bytes" << std::endl;
+                  << data.size() << std::endl;
       }
-      return std::nullopt;
+      // Still try to decode what we can
     }
     
-    // Handle multiplexer logic if needed
+    // Handle multiplexed signals
     if (signal->mux_type() == MultiplexerType::kMultiplexed) {
       // Find the multiplexor signal
-      for (const auto& signal_pair : message->signals()) {
-        const Signal* mux_signal = signal_pair.second.get();
-        if (mux_signal->mux_type() == MultiplexerType::kMultiplexor) {
-          // Decode the multiplexor value
-          double mux_value = SignalDecoder::decode(
-            data,
-            mux_signal->start_bit(),
-            mux_signal->length(),
-            mux_signal->is_little_endian(),
-            mux_signal->is_signed(),
-            mux_signal->factor(),
-            mux_signal->offset()
+      for (const auto& [name, signal_ptr] : message->signals()) {
+        if (signal_ptr->mux_type() == MultiplexerType::kMultiplexor) {
+          // Decode the multiplexor signal
+          auto mux_decoded = decode_signal_internal(
+            signal_ptr->start_bit(),
+            signal_ptr->length(),
+            signal_ptr->is_little_endian(),
+            signal_ptr->is_signed(),
+            signal_ptr->factor(),
+            signal_ptr->offset(),
+            data
           );
           
-          // Check if the signal should be included based on multiplexor value
-          if (signal->mux_value() != static_cast<uint32_t>(mux_value)) {
+          // Check if the multiplexor value matches
+          if (signal->mux_value() != static_cast<uint32_t>(mux_decoded.value)) {
             if (options_.verbose) {
-              std::cerr << "Signal " << signal_name << " is multiplexed with value " 
+              std::cerr << "Multiplexed signal " << signal_name << " requires multiplexor value "
                         << signal->mux_value() << " but multiplexor is "
-                        << mux_value << std::endl;
+                        << static_cast<uint32_t>(mux_decoded.value) << std::endl;
             }
             return std::nullopt;
           }
@@ -210,49 +192,48 @@ class Decoder::Impl {
     }
     
     // Decode the signal
-    double value = SignalDecoder::decode(
-      data,
+    auto decoded_signal = decode_signal_internal(
       signal->start_bit(),
       signal->length(),
       signal->is_little_endian(),
       signal->is_signed(),
       signal->factor(),
-      signal->offset()
+      signal->offset(),
+      data
     );
     
-    // Create decoded signal
-    DecodedSignal decoded_signal;
-    decoded_signal.name = signal_name;
-    decoded_signal.value = value;
-    decoded_signal.unit = signal->unit();
+    DecodedSignal result;
+    result.name = signal_name;
+    result.value = decoded_signal.value;
+    result.unit = signal->unit();
     
-    // Look for value description
+    // Check if there's a value description
     const auto& descriptions = signal->value_descriptions();
-    auto it = descriptions.find(static_cast<uint64_t>(value));
+    auto it = descriptions.find(static_cast<int64_t>(decoded_signal.value));
     if (it != descriptions.end()) {
-      decoded_signal.description = it->second;
+      result.description = it->second;
     }
     
-    return decoded_signal;
+    return result;
   }
   
-  std::optional<std::string> get_value_description(MessageId id, const std::string& signal_name, 
-                                               double value) const {
-    // Get the message from the database
-    const Message* message = db_->get_message(id);
+  std::optional<std::string> get_value_description(MessageId id, const std::string& signal_name,
+                                                 double value) const {
+    // Find the message in the database
+    const Message* message = db_.get_message(id);
     if (!message) {
       return std::nullopt;
     }
     
-    // Get the signal from the message
+    // Find the signal in the message
     const Signal* signal = message->get_signal(signal_name);
     if (!signal) {
       return std::nullopt;
     }
     
-    // Look for value description
+    // Check if there's a value description
     const auto& descriptions = signal->value_descriptions();
-    auto it = descriptions.find(static_cast<uint64_t>(value));
+    auto it = descriptions.find(static_cast<int64_t>(value));
     if (it != descriptions.end()) {
       return it->second;
     }
@@ -260,14 +241,74 @@ class Decoder::Impl {
     return std::nullopt;
   }
   
- private:
-  std::shared_ptr<Database> db_;
+private:
+  struct DecodedRawSignal {
+    double value;
+  };
+  
+  DecodedRawSignal decode_signal_internal(uint32_t start_bit, uint32_t length,
+                                         bool is_little_endian, bool is_signed,
+                                         double factor, double offset,
+                                         const std::vector<uint8_t>& data) const {
+    // Extract the raw value from the data
+    uint64_t raw_value = 0;
+    
+    if (is_little_endian) {
+      // Intel format (little endian)
+      uint32_t byte_index = start_bit / 8;
+      uint32_t bit_index = start_bit % 8;
+      uint32_t bits_remaining = length;
+      
+      while (bits_remaining > 0 && byte_index < data.size()) {
+        uint32_t bits_to_read = std::min(8 - bit_index, bits_remaining);
+        uint64_t mask = ((1ULL << bits_to_read) - 1) << bit_index;
+        uint64_t bits = (data[byte_index] & mask) >> bit_index;
+        
+        raw_value |= bits << (length - bits_remaining);
+        
+        bits_remaining -= bits_to_read;
+        byte_index++;
+        bit_index = 0;
+      }
+    } else {
+      // Motorola format (big endian)
+      uint32_t byte_index = start_bit / 8;
+      uint32_t bit_index = 7 - (start_bit % 8);
+      uint32_t bits_remaining = length;
+      
+      while (bits_remaining > 0 && byte_index < data.size()) {
+        uint32_t bits_to_read = std::min(bit_index + 1, bits_remaining);
+        uint64_t mask = ((1ULL << bits_to_read) - 1) << (bit_index - bits_to_read + 1);
+        uint64_t bits = (data[byte_index] & mask) >> (bit_index - bits_to_read + 1);
+        
+        raw_value |= bits << (length - bits_remaining);
+        
+        bits_remaining -= bits_to_read;
+        byte_index++;
+        bit_index = 7;
+      }
+    }
+    
+    // Apply sign extension if needed
+    if (is_signed && (raw_value & (1ULL << (length - 1)))) {
+      raw_value |= ~((1ULL << length) - 1);
+    }
+    
+    // Apply factor and offset
+    double physical_value = static_cast<double>(raw_value) * factor + offset;
+    
+    DecodedRawSignal result;
+    result.value = physical_value;
+    return result;
+  }
+  
+  const Database& db_;
   DecoderOptions options_;
 };
 
 // Decoder implementation
-Decoder::Decoder(std::shared_ptr<Database> db, const DecoderOptions& options)
-  : impl_(std::make_unique<Impl>(std::move(db), options)) {}
+Decoder::Decoder(const Database& db, const DecoderOptions& options)
+  : impl_(std::make_unique<Impl>(db, options)) {}
 
 Decoder::~Decoder() = default;
 
@@ -276,12 +317,12 @@ std::optional<DecodedMessage> Decoder::decode_frame(MessageId id, const std::vec
 }
 
 std::optional<DecodedSignal> Decoder::decode_signal(MessageId id, const std::string& signal_name,
-                                                 const std::vector<uint8_t>& data) const {
+                                                  const std::vector<uint8_t>& data) const {
   return impl_->decode_signal(id, signal_name, data);
 }
 
 std::optional<std::string> Decoder::get_value_description(MessageId id, const std::string& signal_name,
-                                                       double value) const {
+                                                        double value) const {
   return impl_->get_value_description(id, signal_name, value);
 }
 

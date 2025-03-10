@@ -242,24 +242,13 @@ TEST_F(DbcParserTest, ParserFactoryTest) {
   EXPECT_NE(nullptr, dbc_parser);
   EXPECT_TRUE(dynamic_cast<DbcParser*>(dbc_parser.get()) != nullptr);
   
-  // Test with .kcd extension
-  auto kcd_parser = ParserFactory::create_parser("test.kcd");
-  EXPECT_NE(nullptr, kcd_parser);
-  EXPECT_TRUE(dynamic_cast<KcdParser*>(kcd_parser.get()) != nullptr);
-  
-  // Test with unknown extension
-  auto default_parser = ParserFactory::create_parser("test.unknown");
-  EXPECT_NE(nullptr, default_parser);
-  EXPECT_TRUE(dynamic_cast<DbcParser*>(default_parser.get()) != nullptr);
+  // Test with unknown extension (should throw an exception)
+  EXPECT_THROW(ParserFactory::create_parser("test.unknown"), std::runtime_error);
   
   // Test direct creation
   auto direct_dbc = ParserFactory::create_dbc_parser();
   EXPECT_NE(nullptr, direct_dbc);
   EXPECT_TRUE(dynamic_cast<DbcParser*>(direct_dbc.get()) != nullptr);
-  
-  auto direct_kcd = ParserFactory::create_kcd_parser();
-  EXPECT_NE(nullptr, direct_kcd);
-  EXPECT_TRUE(dynamic_cast<KcdParser*>(direct_kcd.get()) != nullptr);
 }
 
 TEST_F(DbcParserTest, DecodeFrame) {

@@ -205,9 +205,8 @@ TEST_F(IntegrationTest, CompleteWorkflow) {
   ASSERT_NE(nullptr, dbc_parser);
   EXPECT_TRUE(dynamic_cast<DbcParser*>(dbc_parser.get()) != nullptr);
   
-  auto kcd_parser = ParserFactory::create_parser("test.kcd");
-  ASSERT_NE(nullptr, kcd_parser);
-  EXPECT_TRUE(dynamic_cast<KcdParser*>(kcd_parser.get()) != nullptr);
+  // Test with unsupported extension
+  EXPECT_THROW(ParserFactory::create_parser("test.unknown"), std::runtime_error);
 }
 
 } // namespace testing
