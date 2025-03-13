@@ -11,4 +11,12 @@ build:opt --copt=-march=native
 test --test_output=errors
 
 # Use remote cache if specified
-build:remote --remote_cache=grpc://localhost:9092 
+build:remote --remote_cache=grpc://localhost:9092
+
+# Additional common settings for better build experience
+build --verbose_failures
+build --color=yes
+build --show_progress_rate_limit=0.5
+
+# Allow empty glob patterns
+build --incompatible_disallow_empty_glob=false 

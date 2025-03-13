@@ -19,6 +19,15 @@ cc_library(
     ],
     includes = ["include"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@boost.spirit",
+        "@boost.fusion",
+        "@boost.variant",
+        "@boost.optional",
+        "@boost.phoenix",
+        "@boost.filesystem",
+        "@boost.program_options",
+    ],
 )
 
 # Re-enable tests now that the Boost macro issues are fixed
@@ -28,7 +37,6 @@ cc_test(
         [
             "test/**/*.cpp",
         ],
-        allow_empty = True,
     ),
     deps = [
         ":dbc_parser",
@@ -41,9 +49,6 @@ cc_binary(
     srcs = ["tools/dbc_parser_cli.cpp"],
     copts = [
         "-std=c++17",
-    ],
-    linkopts = [
-        "-lboost_program_options",
     ],
     deps = [
         ":dbc_parser",
