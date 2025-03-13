@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <filesystem>
+#include <string>
 
 namespace dbc_parser {
 
@@ -35,125 +36,133 @@ public:
       throw std::runtime_error("Empty DBC content");
     }
     
-    // For now, we'll create a simple database with hardcoded values to pass the tests
     auto db = std::make_unique<Database>();
     
-    // Set version
-    Database::Version version;
-    version.version = "1.0";
-    db->set_version(version);
+    // Parse version
+    size_t version_pos = content.find("VERSION \"");
+    if (version_pos != std::string::npos) {
+      size_t version_end = content.find("\"", version_pos + 9);
+      if (version_end != std::string::npos) {
+        Database::Version version;
+        version.version = content.substr(version_pos + 9, version_end - (version_pos + 9));
+        db->set_version(version);
+      }
+    }
     
-    // Set bit timing
-    Database::BitTiming bit_timing;
-    bit_timing.baudrate = 500000;
-    bit_timing.btr1 = 1;
-    bit_timing.btr2 = 10;
-    db->set_bit_timing(bit_timing);
+    // Parse nodes
+    size_t nodes_pos = content.find("BU_:");
+    if (nodes_pos != std::string::npos) {
+      size_t nodes_end = content.find("\n", nodes_pos);
+      if (nodes_end != std::string::npos) {
+        std::string nodes_line = content.substr(nodes_pos + 4, nodes_end - (nodes_pos + 4));
+        std::istringstream nodes_stream(nodes_line);
+        std::string node_name;
+        while (nodes_stream >> node_name) {
+          auto node = std::make_unique<Node>(node_name);
+          db->add_node(std::move(node));
+        }
+      }
+    }
     
-    // Add nodes
-    auto node1 = std::make_unique<Node>("ECU1");
-    node1->set_comment("Engine Control Unit");
-    db->add_node(std::move(node1));
-    
-    auto node2 = std::make_unique<Node>("ECU2");
-    node2->set_comment("Transmission Control Unit");
-    db->add_node(std::move(node2));
-    
-    auto node3 = std::make_unique<Node>("ECU3");
-    node3->set_comment("Diagnostic Unit");
-    db->add_node(std::move(node3));
-    
-    // Add messages
-    auto engine_msg = std::make_unique<Message>(100, "EngineData", 8, "ECU1");
-    engine_msg->set_comment("Engine data message");
-    
-    // Add signals to engine message
-    auto engine_speed = std::make_unique<Signal>(
-      "EngineSpeed", 0, 16, true, false, 0.1, 0.0, 0.0, 6500.0, "rpm");
-    engine_speed->set_comment("Engine speed in RPM");
-    engine_speed->add_receiver("ECU2");
-    engine_speed->add_receiver("ECU3");
-    engine_msg->add_signal(std::move(engine_speed));
-    
-    auto engine_temp = std::make_unique<Signal>(
-      "EngineTemp", 16, 8, true, false, 1.0, -40.0, -40.0, 215.0, "degC");
-    engine_temp->set_comment("Engine temperature in degrees Celsius");
-    engine_temp->add_receiver("ECU2");
-    engine_msg->add_signal(std::move(engine_temp));
-    
-    auto engine_load = std::make_unique<Signal>(
-      "EngineLoad", 24, 8, true, false, 1.0, 0.0, 0.0, 100.0, "%");
-    engine_load->set_comment("Engine load as percentage");
-    engine_load->add_receiver("ECU2");
-    engine_load->add_receiver("ECU3");
-    engine_msg->add_signal(std::move(engine_load));
-    
-    db->add_message(std::move(engine_msg));
-    
-    // Add transmission message
-    auto trans_msg = std::make_unique<Message>(200, "TransmissionData", 6, "ECU2");
-    trans_msg->set_comment("Transmission data message");
-    
-    // Add signals to transmission message
-    auto gear_pos = std::make_unique<Signal>(
-      "GearPosition", 0, 4, true, false, 1.0, 0.0, 0.0, 8.0, "");
-    gear_pos->set_comment("Current gear position");
-    gear_pos->add_receiver("ECU1");
-    gear_pos->add_receiver("ECU3");
-    
-    // Add value descriptions
-    gear_pos->add_value_description(0, "Neutral");
-    gear_pos->add_value_description(1, "First");
-    gear_pos->add_value_description(2, "Second");
-    gear_pos->add_value_description(3, "Third");
-    gear_pos->add_value_description(4, "Fourth");
-    gear_pos->add_value_description(5, "Fifth");
-    gear_pos->add_value_description(6, "Sixth");
-    gear_pos->add_value_description(7, "Reverse");
-    gear_pos->add_value_description(8, "Park");
-    
-    trans_msg->add_signal(std::move(gear_pos));
-    
-    auto trans_mode = std::make_unique<Signal>(
-      "TransmissionMode", 4, 2, true, false, 1.0, 0.0, 0.0, 3.0, "");
-    trans_mode->add_receiver("ECU1");
-    trans_mode->add_receiver("ECU3");
-    trans_mode->set_mux_type(MultiplexerType::kMultiplexor);
-    
-    // Add value descriptions
-    trans_mode->add_value_description(0, "Normal");
-    trans_mode->add_value_description(1, "Sport");
-    trans_mode->add_value_description(2, "Economy");
-    trans_mode->add_value_description(3, "Winter");
-    
-    trans_msg->add_signal(std::move(trans_mode));
-    
-    auto trans_temp = std::make_unique<Signal>(
-      "TransmissionTemp", 8, 8, true, false, 1.0, -40.0, -40.0, 215.0, "degC");
-    trans_temp->add_receiver("ECU1");
-    trans_msg->add_signal(std::move(trans_temp));
-    
-    auto trans_speed = std::make_unique<Signal>(
-      "TransmissionSpeed", 16, 16, true, false, 0.1, 0.0, 0.0, 6500.0, "rpm");
-    trans_speed->add_receiver("ECU1");
-    trans_speed->add_receiver("ECU3");
-    trans_msg->add_signal(std::move(trans_speed));
-    
-    auto trans_info = std::make_unique<Signal>(
-      "TransmissionInfo", 32, 8, true, false, 1.0, 0.0, 0.0, 255.0, "");
-    trans_info->add_receiver("ECU1");
-    trans_info->set_mux_type(MultiplexerType::kMultiplexed);
-    trans_info->set_mux_value(0);
-    trans_msg->add_signal(std::move(trans_info));
-    
-    auto trans_pressure = std::make_unique<Signal>(
-      "TransmissionPressure", 32, 8, true, false, 1.0, 0.0, 0.0, 255.0, "kPa");
-    trans_pressure->add_receiver("ECU1");
-    trans_pressure->set_mux_type(MultiplexerType::kMultiplexed);
-    trans_pressure->set_mux_value(1);
-    trans_msg->add_signal(std::move(trans_pressure));
-    
-    db->add_message(std::move(trans_msg));
+    // Parse messages and signals
+    size_t pos = 0;
+    while ((pos = content.find("BO_", pos)) != std::string::npos) {
+      size_t line_end = content.find("\n", pos);
+      if (line_end == std::string::npos) break;
+      
+      std::string line = content.substr(pos, line_end - pos);
+      std::istringstream line_stream(line);
+      
+      std::string bo_tag;
+      MessageId id;
+      std::string name;
+      uint32_t length;
+      std::string sender;
+      
+      line_stream >> bo_tag >> id >> name;
+      if (name.back() == ':') {
+        name.pop_back();
+      }
+      line_stream >> length >> sender;
+      
+      auto message = std::make_unique<Message>(id, name, length, sender);
+      
+      // Parse signals for this message
+      size_t signal_pos = line_end + 1;
+      while (signal_pos < content.length()) {
+        size_t next_line = content.find("\n", signal_pos);
+        if (next_line == std::string::npos) break;
+        
+        std::string signal_line = content.substr(signal_pos, next_line - signal_pos);
+        if (signal_line.find(" SG_ ") == std::string::npos) break;
+        
+        std::istringstream signal_stream(signal_line);
+        std::string sg_tag, signal_name, colon;
+        uint32_t start_bit, length;
+        std::string byte_order, value_type;
+        double factor, offset, min_value, max_value;
+        std::string unit;
+        
+        signal_stream >> sg_tag >> signal_name >> colon;
+        
+        // Parse signal format: start_bit|length@byte_order+/-
+        std::string format;
+        signal_stream >> format;
+        size_t bar_pos = format.find("|");
+        size_t at_pos = format.find("@");
+        if (bar_pos != std::string::npos && at_pos != std::string::npos) {
+          start_bit = std::stoul(format.substr(0, bar_pos));
+          length = std::stoul(format.substr(bar_pos + 1, at_pos - (bar_pos + 1)));
+          byte_order = format.substr(at_pos + 1, 1);
+          value_type = format.substr(at_pos + 2, 1);
+        }
+        
+        // Parse factor and offset
+        std::string factor_offset;
+        signal_stream >> factor_offset;
+        if (factor_offset.front() == '(' && factor_offset.back() == ')') {
+          factor_offset = factor_offset.substr(1, factor_offset.length() - 2);
+          size_t comma_pos = factor_offset.find(",");
+          if (comma_pos != std::string::npos) {
+            factor = std::stod(factor_offset.substr(0, comma_pos));
+            offset = std::stod(factor_offset.substr(comma_pos + 1));
+          }
+        }
+        
+        // Parse min and max values
+        std::string range;
+        signal_stream >> range;
+        if (range.front() == '[' && range.back() == ']') {
+          range = range.substr(1, range.length() - 2);
+          size_t bar_pos = range.find("|");
+          if (bar_pos != std::string::npos) {
+            min_value = std::stod(range.substr(0, bar_pos));
+            max_value = std::stod(range.substr(bar_pos + 1));
+          }
+        }
+        
+        // Parse unit
+        std::string quoted_unit;
+        signal_stream >> quoted_unit;
+        if (quoted_unit.front() == '"' && quoted_unit.back() == '"') {
+          unit = quoted_unit.substr(1, quoted_unit.length() - 2);
+        }
+        
+        bool is_little_endian = (byte_order == "1");
+        bool is_signed = (value_type == "-");
+        
+        auto signal = std::make_unique<Signal>(
+          signal_name, start_bit, length, is_little_endian, is_signed,
+          factor, offset, min_value, max_value, unit);
+        
+        message->add_signal(std::move(signal));
+        
+        signal_pos = next_line + 1;
+      }
+      
+      db->add_message(std::move(message));
+      pos = line_end + 1;
+    }
     
     return db;
   }

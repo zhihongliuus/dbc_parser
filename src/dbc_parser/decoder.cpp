@@ -36,15 +36,17 @@ public:
       return result;
     }
     
-    // Check if data is long enough
-    if (data.size() < message->length()) {
-      if (options_.verbose) {
-        std::cerr << "Data too short for message " << message->name()
-                  << ": expected " << message->length() << " bytes, got "
-                  << data.size() << std::endl;
+    // Check if any signal is out of bounds of the message's declared length
+    for (const auto& [name, signal] : message->signals()) {
+      uint32_t signal_last_bit = signal->start_bit() + signal->length();
+      if (signal_last_bit > message->length() * 8) {
+        if (options_.verbose) {
+          std::cerr << "Signal " << signal->name() << " is out of bounds for message " << message->name()
+                    << ": requires bit " << signal_last_bit - 1 << " but message length is "
+                    << message->length() << " bytes (" << message->length() * 8 << " bits)" << std::endl;
+        }
+        return std::nullopt;
       }
-      // Return nullopt when data is too short
-      return std::nullopt;
     }
     
     DecodedMessage result;
@@ -55,9 +57,73 @@ public:
     uint32_t mux_value = 0;
     bool has_multiplexor = false;
     
+    // Check if we have enough data for any signal in the message
+    bool has_valid_signals = false;
+    
     for (const auto& [name, signal] : message->signals()) {
+      uint32_t signal_last_byte = (signal->start_bit() + signal->length() + 7) / 8;
+      if (data.size() >= signal_last_byte) {
+        has_valid_signals = true;
+        if (signal->mux_type() == MultiplexerType::kMultiplexor) {
+          // Decode the multiplexor signal
+          auto decoded_signal = decode_signal_internal(
+            signal->start_bit(),
+            signal->length(),
+            signal->is_little_endian(),
+            signal->is_signed(),
+            signal->factor(),
+            signal->offset(),
+            data
+          );
+          
+          mux_value = static_cast<uint32_t>(decoded_signal.value);
+          has_multiplexor = true;
+          
+          // Add the multiplexor signal to the result
+          DecodedSignal decoded;
+          decoded.name = signal->name();
+          decoded.value = decoded_signal.value;
+          decoded.unit = signal->unit();
+          
+          // Check if there's a value description
+          const auto& descriptions = signal->value_descriptions();
+          auto it = descriptions.find(static_cast<int64_t>(decoded_signal.value));
+          if (it != descriptions.end()) {
+            decoded.description = it->second;
+          }
+          
+          result.signals.emplace(signal->name(), std::move(decoded));
+          break;
+        }
+      }
+    }
+    
+    // If we don't have enough data for any signal, return nullopt
+    if (!has_valid_signals) {
+      if (options_.verbose) {
+        std::cerr << "Data too short for any signal in message " << message->name()
+                  << ": got " << data.size() << " bytes" << std::endl;
+      }
+      return std::nullopt;
+    }
+    
+    // Second pass: decode all signals that have enough data
+    for (const auto& [name, signal] : message->signals()) {
+      // Skip the multiplexor signal (already decoded)
       if (signal->mux_type() == MultiplexerType::kMultiplexor) {
-        // Decode the multiplexor signal
+        continue;
+      }
+      
+      // Skip multiplexed signals that don't match the current multiplexor value
+      if (signal->mux_type() == MultiplexerType::kMultiplexed &&
+          signal->mux_value() != mux_value) {
+        continue;
+      }
+      
+      // Check if we have enough data for this signal
+      uint32_t signal_last_byte = (signal->start_bit() + signal->length() + 7) / 8;
+      if (data.size() >= signal_last_byte) {
+        // Decode the signal
         auto decoded_signal = decode_signal_internal(
           signal->start_bit(),
           signal->length(),
@@ -68,10 +134,6 @@ public:
           data
         );
         
-        mux_value = static_cast<uint32_t>(decoded_signal.value);
-        has_multiplexor = true;
-        
-        // Add the multiplexor signal to the result
         DecodedSignal decoded;
         decoded.name = signal->name();
         decoded.value = decoded_signal.value;
@@ -85,47 +147,10 @@ public:
         }
         
         result.signals.emplace(signal->name(), std::move(decoded));
-        break;
+      } else if (options_.verbose) {
+        std::cerr << "Skipping signal " << signal->name() << " in message " << message->name()
+                  << ": requires " << signal_last_byte << " bytes, got " << data.size() << std::endl;
       }
-    }
-    
-    // Second pass: decode all signals
-    for (const auto& [name, signal] : message->signals()) {
-      // Skip the multiplexor signal (already decoded)
-      if (signal->mux_type() == MultiplexerType::kMultiplexor) {
-        continue;
-      }
-      
-      // Skip multiplexed signals that don't match the current multiplexor value
-      if (signal->mux_type() == MultiplexerType::kMultiplexed &&
-          signal->mux_value() != mux_value) {
-        continue;
-      }
-      
-      // Decode the signal
-      auto decoded_signal = decode_signal_internal(
-        signal->start_bit(),
-        signal->length(),
-        signal->is_little_endian(),
-        signal->is_signed(),
-        signal->factor(),
-        signal->offset(),
-        data
-      );
-      
-      DecodedSignal decoded;
-      decoded.name = signal->name();
-      decoded.value = decoded_signal.value;
-      decoded.unit = signal->unit();
-      
-      // Check if there's a value description
-      const auto& descriptions = signal->value_descriptions();
-      auto it = descriptions.find(static_cast<int64_t>(decoded_signal.value));
-      if (it != descriptions.end()) {
-        decoded.description = it->second;
-      }
-      
-      result.signals.emplace(signal->name(), std::move(decoded));
     }
     
     return result;
@@ -152,14 +177,13 @@ public:
       return std::nullopt;
     }
     
-    // Check if data is long enough
-    if (data.size() < message->length()) {
+    // Check if we have enough data for this signal
+    uint32_t signal_last_byte = (signal->start_bit() + signal->length() + 7) / 8;
+    if (data.size() < signal_last_byte) {
       if (options_.verbose) {
-        std::cerr << "Data too short for message " << message->name()
-                  << ": expected " << message->length() << " bytes, got "
-                  << data.size() << std::endl;
+        std::cerr << "Data too short for signal " << signal_name << " in message " << message->name()
+                  << ": requires " << signal_last_byte << " bytes, got " << data.size() << std::endl;
       }
-      // Return nullopt when data is too short
       return std::nullopt;
     }
     
@@ -168,6 +192,16 @@ public:
       // Find the multiplexor signal
       for (const auto& [name, signal_ptr] : message->signals()) {
         if (signal_ptr->mux_type() == MultiplexerType::kMultiplexor) {
+          // Check if we have enough data for the multiplexor signal
+          uint32_t mux_last_byte = (signal_ptr->start_bit() + signal_ptr->length() + 7) / 8;
+          if (data.size() < mux_last_byte) {
+            if (options_.verbose) {
+              std::cerr << "Data too short for multiplexor signal in message " << message->name()
+                        << ": requires " << mux_last_byte << " bytes, got " << data.size() << std::endl;
+            }
+            return std::nullopt;
+          }
+          
           // Decode the multiplexor signal
           auto mux_decoded = decode_signal_internal(
             signal_ptr->start_bit(),
@@ -262,7 +296,8 @@ private:
       uint32_t bits_remaining = length;
       
       while (bits_remaining > 0 && byte_index < data.size()) {
-        uint32_t bits_to_read = std::min(8 - bit_index, bits_remaining);
+        uint32_t bits_to_read = std::min(std::min(8 - bit_index, bits_remaining), 
+                                       static_cast<uint32_t>((data.size() - byte_index) * 8 - bit_index));
         uint64_t mask = ((1ULL << bits_to_read) - 1) << bit_index;
         uint64_t bits = (data[byte_index] & mask) >> bit_index;
         
@@ -279,7 +314,8 @@ private:
       uint32_t bits_remaining = length;
       
       while (bits_remaining > 0 && byte_index < data.size()) {
-        uint32_t bits_to_read = std::min(bit_index + 1, bits_remaining);
+        uint32_t bits_to_read = std::min(std::min(bit_index + 1, bits_remaining),
+                                       static_cast<uint32_t>((data.size() - byte_index) * 8));
         uint64_t mask = ((1ULL << bits_to_read) - 1) << (bit_index - bits_to_read + 1);
         uint64_t bits = (data[byte_index] & mask) >> (bit_index - bits_to_read + 1);
         
