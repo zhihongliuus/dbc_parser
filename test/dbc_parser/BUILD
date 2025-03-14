@@ -14,7 +14,13 @@ cc_test(
         "//:dbc_parser",
         "@googletest//:gtest_main",
     ],
-    data = [":sample_files"],
+    data = [
+        "test.dbc",
+    ],
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
+    ],
 )
 
 cc_test(
@@ -24,6 +30,10 @@ cc_test(
         "//:dbc_parser",
         "@googletest//:gtest_main",
     ],
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
+    ],
 )
 
 cc_test(
@@ -32,6 +42,10 @@ cc_test(
     deps = [
         "//:dbc_parser",
         "@googletest//:gtest_main",
+    ],
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
     ],
 )
 
@@ -43,6 +57,10 @@ cc_test(
         "@googletest//:gtest_main",
     ],
     data = [":sample_files"],
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
+    ],
 )
 
 cc_test(
@@ -53,6 +71,10 @@ cc_test(
         "@googletest//:gtest_main",
     ],
     data = [":sample_files"],
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
+    ],
 )
 
 cc_test(
@@ -62,7 +84,21 @@ cc_test(
         "//:dbc_parser",
         "@googletest//:gtest_main",
     ],
-) 
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
+    ],
+)
 
-
-
+cc_test(
+    name = "dbc_components_test",
+    srcs = ["dbc_components_test.cpp"],
+    deps = [
+        "//:dbc_parser",
+        "@googletest//:gtest_main",
+    ],
+    copts = [
+        "-std=c++17",
+        "-DBOOST_PHOENIX_STL_TUPLE_H_",
+    ],
+)

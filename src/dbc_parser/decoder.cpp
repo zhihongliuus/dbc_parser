@@ -7,16 +7,12 @@
 
 namespace dbc_parser {
 
-/**
- * General-purpose implementation of the Decoder class that uses a Database to decode CAN frames.
- * This implementation relies entirely on the interfaces provided by Database, Message, and Signal.
- */
 class Decoder::Impl {
 public:
   Impl(const Database& db, const DecoderOptions& options)
     : db_(db), options_(options) {}
   
-  std::optional<DecodedMessage> decode_frame(MessageId id, const std::vector<uint8_t>& data) const {
+  std::optional<DecodedMessage> decode_frame(uint32_t id, const std::vector<uint8_t>& data) const {
     // Find the message in the database
     const Message* message = db_.get_message(id);
     
@@ -156,7 +152,7 @@ public:
     return result;
   }
   
-  std::optional<DecodedSignal> decode_signal(MessageId id, const std::string& signal_name,
+  std::optional<DecodedSignal> decode_signal(uint32_t id, const std::string& signal_name,
                                            const std::vector<uint8_t>& data) const {
     // Find the message in the database
     const Message* message = db_.get_message(id);
@@ -253,8 +249,8 @@ public:
     return result;
   }
   
-  std::optional<std::string> get_value_description(MessageId id, const std::string& signal_name,
-                                                 double value) const {
+  std::optional<std::string> get_value_description(uint32_t id, const std::string& signal_name,
+                                                 int64_t value) const {
     // Find the message in the database
     const Message* message = db_.get_message(id);
     if (!message) {
@@ -269,7 +265,7 @@ public:
     
     // Check if there's a value description
     const auto& descriptions = signal->value_descriptions();
-    auto it = descriptions.find(static_cast<int64_t>(value));
+    auto it = descriptions.find(value);
     if (it != descriptions.end()) {
       return it->second;
     }
@@ -346,22 +342,22 @@ private:
 
 // Decoder implementation
 Decoder::Decoder(const Database& db, const DecoderOptions& options)
-  : impl_(std::make_unique<Impl>(db, options)) {}
+  : db_(db), options_(options), impl_(std::make_unique<Impl>(db, options)) {}
 
 Decoder::~Decoder() = default;
 
-std::optional<DecodedMessage> Decoder::decode_frame(MessageId id, const std::vector<uint8_t>& data) const {
+std::optional<DecodedMessage> Decoder::decode_frame(uint32_t id, const std::vector<uint8_t>& data) const {
   return impl_->decode_frame(id, data);
 }
 
-std::optional<DecodedSignal> Decoder::decode_signal(MessageId id, const std::string& signal_name,
+std::optional<DecodedSignal> Decoder::decode_signal(uint32_t id, const std::string& signal_name,
                                                   const std::vector<uint8_t>& data) const {
   return impl_->decode_signal(id, signal_name, data);
 }
 
-std::optional<std::string> Decoder::get_value_description(MessageId id, const std::string& signal_name,
-                                                        double value) const {
-  return impl_->get_value_description(id, signal_name, value);
+std::optional<std::string> Decoder::get_value_description(uint32_t id, const std::string& signal_name,
+                                                        int64_t value) const {
+  return impl_->get_value_description(id, signal_name, static_cast<double>(value));
 }
 
 } // namespace dbc_parser 

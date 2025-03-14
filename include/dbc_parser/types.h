@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <variant>
+#include <optional>
 
 namespace dbc_parser {
 
@@ -33,8 +34,10 @@ enum class MultiplexerType {
 
 enum class SignalExtendedValueType {
   kNone,
+  kInteger,
   kFloat,
-  kDouble
+  kDouble,
+  kString
 };
 
 enum class AttributeType {
@@ -78,12 +81,12 @@ public:
   };
 
   // Accessors for version
-  void set_version(const Version& version) { version_ = version; }
-  const Version* version() const { return &version_; }
+  void set_version(const Version& version) { version_ = std::make_unique<Version>(version); }
+  const Version* version() const { return version_.get(); }
 
   // Accessors for bit timing
-  void set_bit_timing(const BitTiming& bit_timing) { bit_timing_ = bit_timing; }
-  const BitTiming* bit_timing() const { return &bit_timing_; }
+  void set_bit_timing(const BitTiming& bit_timing) { bit_timing_ = std::make_unique<BitTiming>(bit_timing); }
+  const BitTiming* bit_timing() const { return bit_timing_.get(); }
 
   // Node management
   void add_node(std::unique_ptr<Node> node);
@@ -214,8 +217,8 @@ public:
   }
 
 private:
-  Version version_;
-  BitTiming bit_timing_;
+  std::unique_ptr<Version> version_;
+  std::unique_ptr<BitTiming> bit_timing_;
   std::vector<std::string> new_symbols_;
   std::vector<std::unique_ptr<Node>> nodes_;
   std::vector<std::unique_ptr<Message>> messages_;
@@ -636,6 +639,32 @@ inline Signal* Message::get_signal(const std::string& name) const {
 inline void Message::add_signal_group(std::unique_ptr<SignalGroup> group) {
   signal_groups_.push_back(std::move(group));
 }
+
+// Decoder options
+struct DecoderOptions {
+  bool ignore_unknown_ids = false;
+  bool verbose = false;
+};
+
+// Decoded signal
+struct DecodedSignal {
+  std::string name;
+  double value;
+  std::string unit;
+  std::optional<std::string> description;
+};
+
+// Decoded message
+struct DecodedMessage {
+  uint32_t id;
+  std::string name;
+  std::map<std::string, DecodedSignal> signals;
+};
+
+// Parser options
+struct ParserOptions {
+  bool verbose = false;
+};
 
 } // namespace dbc_parser
 

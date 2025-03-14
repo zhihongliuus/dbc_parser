@@ -15,47 +15,30 @@ namespace dbc_parser {
 // Forward declarations
 class Database;
 
-// Decoded signal structure
-struct DecodedSignal {
-  std::string name;
-  double value;
-  std::string unit;
-  std::optional<std::string> description;
-};
-
-// Decoded message structure
-struct DecodedMessage {
-  MessageId id;
-  std::string name;
-  std::map<std::string, DecodedSignal> signals;
-};
-
-// Decoder options
-struct DecoderOptions {
-  bool verbose = false;
-  bool ignore_unknown_ids = true;
-};
-
 // Decoder class for decoding CAN frames
 class Decoder {
 public:
-  explicit Decoder(const Database& db, const DecoderOptions& options = DecoderOptions());
+  Decoder(const Database& db, const DecoderOptions& options = DecoderOptions());
   ~Decoder();
 
-  // Decode a complete CAN frame
-  std::optional<DecodedMessage> decode_frame(MessageId id, const std::vector<uint8_t>& data) const;
-  
+  // Decode a CAN frame
+  std::optional<DecodedMessage> decode_frame(uint32_t id, const std::vector<uint8_t>& data) const;
+
   // Decode a specific signal from a CAN frame
-  std::optional<DecodedSignal> decode_signal(MessageId id, const std::string& signal_name,
-                                            const std::vector<uint8_t>& data) const;
-  
-  // Get the textual description for a signal value
-  std::optional<std::string> get_value_description(MessageId id, const std::string& signal_name,
-                                                 double value) const;
+  std::optional<DecodedSignal> decode_signal(uint32_t id, const std::string& signal_name, const std::vector<uint8_t>& data) const;
+
+  // Get value description for a signal value
+  std::optional<std::string> get_value_description(uint32_t id, const std::string& signal_name, int64_t value) const;
 
 private:
   class Impl;
+  const Database& db_;
+  DecoderOptions options_;
   std::unique_ptr<Impl> impl_;
+
+  // Helper methods
+  double decode_signal_value(const Signal& signal, const std::vector<uint8_t>& data) const;
+  bool is_multiplexed_signal_active(const Signal& signal, const std::vector<uint8_t>& data) const;
 };
 
 } // namespace dbc_parser

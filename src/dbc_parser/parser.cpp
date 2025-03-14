@@ -28,143 +28,27 @@ public:
     
     std::stringstream buffer;
     buffer << file.rdbuf();
-    return parse_string(buffer.str(), options);
+    return parse(buffer.str(), options);
   }
   
-  std::unique_ptr<Database> parse_string(const std::string& content, const ParserOptions& options) {
-    if (content.empty()) {
-      throw std::runtime_error("Empty DBC content");
+  std::unique_ptr<Database> parse(const std::string& content, const ParserOptions& options) {
+    ParserContext context;
+    DefaultParserErrorHandler error_handler;
+    
+    using iterator_type = std::string::const_iterator;
+    DbcGrammar<iterator_type> grammar(context, error_handler);
+    
+    bool result = qi::phrase_parse(
+        content.begin(), content.end(),
+        grammar,
+        qi::space
+    );
+    
+    if (!result) {
+      throw std::runtime_error("Failed to parse DBC content");
     }
     
-    auto db = std::make_unique<Database>();
-    
-    // Parse version
-    size_t version_pos = content.find("VERSION \"");
-    if (version_pos != std::string::npos) {
-      size_t version_end = content.find("\"", version_pos + 9);
-      if (version_end != std::string::npos) {
-        Database::Version version;
-        version.version = content.substr(version_pos + 9, version_end - (version_pos + 9));
-        db->set_version(version);
-      }
-    }
-    
-    // Parse nodes
-    size_t nodes_pos = content.find("BU_:");
-    if (nodes_pos != std::string::npos) {
-      size_t nodes_end = content.find("\n", nodes_pos);
-      if (nodes_end != std::string::npos) {
-        std::string nodes_line = content.substr(nodes_pos + 4, nodes_end - (nodes_pos + 4));
-        std::istringstream nodes_stream(nodes_line);
-        std::string node_name;
-        while (nodes_stream >> node_name) {
-          auto node = std::make_unique<Node>(node_name);
-          db->add_node(std::move(node));
-        }
-      }
-    }
-    
-    // Parse messages and signals
-    size_t pos = 0;
-    while ((pos = content.find("BO_", pos)) != std::string::npos) {
-      size_t line_end = content.find("\n", pos);
-      if (line_end == std::string::npos) break;
-      
-      std::string line = content.substr(pos, line_end - pos);
-      std::istringstream line_stream(line);
-      
-      std::string bo_tag;
-      MessageId id;
-      std::string name;
-      uint32_t length;
-      std::string sender;
-      
-      line_stream >> bo_tag >> id >> name;
-      if (name.back() == ':') {
-        name.pop_back();
-      }
-      line_stream >> length >> sender;
-      
-      auto message = std::make_unique<Message>(id, name, length, sender);
-      
-      // Parse signals for this message
-      size_t signal_pos = line_end + 1;
-      while (signal_pos < content.length()) {
-        size_t next_line = content.find("\n", signal_pos);
-        if (next_line == std::string::npos) break;
-        
-        std::string signal_line = content.substr(signal_pos, next_line - signal_pos);
-        if (signal_line.find(" SG_ ") == std::string::npos) break;
-        
-        std::istringstream signal_stream(signal_line);
-        std::string sg_tag, signal_name, colon;
-        uint32_t start_bit, length;
-        std::string byte_order, value_type;
-        double factor, offset, min_value, max_value;
-        std::string unit;
-        
-        signal_stream >> sg_tag >> signal_name >> colon;
-        
-        // Parse signal format: start_bit|length@byte_order+/-
-        std::string format;
-        signal_stream >> format;
-        size_t bar_pos = format.find("|");
-        size_t at_pos = format.find("@");
-        if (bar_pos != std::string::npos && at_pos != std::string::npos) {
-          start_bit = std::stoul(format.substr(0, bar_pos));
-          length = std::stoul(format.substr(bar_pos + 1, at_pos - (bar_pos + 1)));
-          byte_order = format.substr(at_pos + 1, 1);
-          value_type = format.substr(at_pos + 2, 1);
-        }
-        
-        // Parse factor and offset
-        std::string factor_offset;
-        signal_stream >> factor_offset;
-        if (factor_offset.front() == '(' && factor_offset.back() == ')') {
-          factor_offset = factor_offset.substr(1, factor_offset.length() - 2);
-          size_t comma_pos = factor_offset.find(",");
-          if (comma_pos != std::string::npos) {
-            factor = std::stod(factor_offset.substr(0, comma_pos));
-            offset = std::stod(factor_offset.substr(comma_pos + 1));
-          }
-        }
-        
-        // Parse min and max values
-        std::string range;
-        signal_stream >> range;
-        if (range.front() == '[' && range.back() == ']') {
-          range = range.substr(1, range.length() - 2);
-          size_t bar_pos = range.find("|");
-          if (bar_pos != std::string::npos) {
-            min_value = std::stod(range.substr(0, bar_pos));
-            max_value = std::stod(range.substr(bar_pos + 1));
-          }
-        }
-        
-        // Parse unit
-        std::string quoted_unit;
-        signal_stream >> quoted_unit;
-        if (quoted_unit.front() == '"' && quoted_unit.back() == '"') {
-          unit = quoted_unit.substr(1, quoted_unit.length() - 2);
-        }
-        
-        bool is_little_endian = (byte_order == "1");
-        bool is_signed = (value_type == "-");
-        
-        auto signal = std::make_unique<Signal>(
-          signal_name, start_bit, length, is_little_endian, is_signed,
-          factor, offset, min_value, max_value, unit);
-        
-        message->add_signal(std::move(signal));
-        
-        signal_pos = next_line + 1;
-      }
-      
-      db->add_message(std::move(message));
-      pos = line_end + 1;
-    }
-    
-    return db;
+    return context.finalize();
   }
   
   bool write_file(const Database& db, const std::string& filename) {
@@ -322,7 +206,7 @@ std::unique_ptr<Database> DbcParser::parse_file(const std::string& filename, con
 }
 
 std::unique_ptr<Database> DbcParser::parse_string(const std::string& content, const ParserOptions& options) {
-  return impl_->parse_string(content, options);
+  return impl_->parse(content, options);
 }
 
 bool DbcParser::write_file(const Database& db, const std::string& filename) {
