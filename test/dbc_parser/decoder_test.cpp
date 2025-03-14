@@ -13,40 +13,92 @@ namespace testing {
 class DecoderTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    auto parser = std::make_unique<DbcParser>();
-    ParserOptions options;
-    options.verbose = true;
+    // Create a database manually instead of parsing from DBC content
+    db_ = std::make_unique<Database>();
     
-    std::string dbc_content = 
-      "VERSION \"1.0\"\n"
-      "\n"
-      "NS_ :\n"
-      "    NS_DESC_\n"
-      "    CM_\n"
-      "    BA_DEF_\n"
-      "    BA_\n"
-      "    VAL_\n"
-      "    CAT_DEF_\n"
-      "    CAT_\n"
-      "    FILTER\n"
-      "\n"
-      "BS_: 500000,1,10\n"
-      "\n"
-      "BU_: ECU1 ECU2 ECU3\n"
-      "\n"
-      "BO_ 100 EngineData: 8 ECU1\n"
-      " SG_ EngineSpeed : 0|16@1+ (0.1,0) [0|6500] \"rpm\" ECU2,ECU3\n"
-      " SG_ EngineTemp : 16|8@1+ (1,-40) [-40|215] \"degC\" ECU2\n"
-      " SG_ EngineLoad : 24|8@1+ (1,0) [0|100] \"%\" ECU2,ECU3\n"
-      "\n"
-      "BO_ 200 TransmissionData: 6 ECU2\n"
-      " SG_ GearPosition : 0|4@1+ (1,0) [0|8] \"\" ECU1,ECU3\n"
-      " SG_ TransmissionTemp : 8|8@1+ (1,-40) [-40|215] \"degC\" ECU1\n"
-      " SG_ TransmissionSpeed : 16|16@1+ (0.1,0) [0|6500] \"rpm\" ECU1,ECU3\n"
-      "\n"
-      "VAL_ 200 GearPosition 0 \"Neutral\" 1 \"First\" 2 \"Second\" 3 \"Third\" 4 \"Fourth\" 5 \"Fifth\" 6 \"Sixth\" 7 \"Reverse\" 8 \"Park\";\n";
+    // Set version
+    Database::Version version;
+    version.version = "1.0";
+    db_->set_version(version);
     
-    db_ = parser->parse_string(dbc_content, options);
+    // Set bit timing
+    Database::BitTiming bit_timing;
+    bit_timing.baudrate = 500000;
+    bit_timing.btr1 = 1;
+    bit_timing.btr2 = 10;
+    db_->set_bit_timing(bit_timing);
+    
+    // Add nodes
+    auto ecu1 = std::make_unique<Node>("ECU1");
+    auto ecu2 = std::make_unique<Node>("ECU2");
+    auto ecu3 = std::make_unique<Node>("ECU3");
+    db_->add_node(std::move(ecu1));
+    db_->add_node(std::move(ecu2));
+    db_->add_node(std::move(ecu3));
+    
+    // Add EngineData message
+    auto engine_msg = std::make_unique<Message>(100, "EngineData", 8, "ECU1");
+    
+    // Add signals to EngineData
+    auto engine_speed = std::make_unique<Signal>(
+      "EngineSpeed", 0, 16, true, false, 0.1, 0.0, 0.0, 6500.0, "rpm"
+    );
+    engine_speed->add_receiver("ECU2");
+    engine_speed->add_receiver("ECU3");
+    engine_msg->add_signal(std::move(engine_speed));
+    
+    auto engine_temp = std::make_unique<Signal>(
+      "EngineTemp", 16, 8, true, false, 1.0, -40.0, -40.0, 215.0, "degC"
+    );
+    engine_temp->add_receiver("ECU2");
+    engine_msg->add_signal(std::move(engine_temp));
+    
+    auto engine_load = std::make_unique<Signal>(
+      "EngineLoad", 24, 8, true, false, 1.0, 0.0, 0.0, 100.0, "%"
+    );
+    engine_load->add_receiver("ECU2");
+    engine_load->add_receiver("ECU3");
+    engine_msg->add_signal(std::move(engine_load));
+    
+    db_->add_message(std::move(engine_msg));
+    
+    // Add TransmissionData message
+    auto trans_msg = std::make_unique<Message>(200, "TransmissionData", 6, "ECU2");
+    
+    // Add signals to TransmissionData
+    auto gear_pos = std::make_unique<Signal>(
+      "GearPosition", 0, 4, true, false, 1.0, 0.0, 0.0, 8.0, ""
+    );
+    gear_pos->add_receiver("ECU1");
+    gear_pos->add_receiver("ECU3");
+    
+    // Add value descriptions for GearPosition
+    gear_pos->add_value_description(0, "Neutral");
+    gear_pos->add_value_description(1, "First");
+    gear_pos->add_value_description(2, "Second");
+    gear_pos->add_value_description(3, "Third");
+    gear_pos->add_value_description(4, "Fourth");
+    gear_pos->add_value_description(5, "Fifth");
+    gear_pos->add_value_description(6, "Sixth");
+    gear_pos->add_value_description(7, "Reverse");
+    gear_pos->add_value_description(8, "Park");
+    
+    trans_msg->add_signal(std::move(gear_pos));
+    
+    auto trans_temp = std::make_unique<Signal>(
+      "TransmissionTemp", 8, 8, true, false, 1.0, -40.0, -40.0, 215.0, "degC"
+    );
+    trans_temp->add_receiver("ECU1");
+    trans_msg->add_signal(std::move(trans_temp));
+    
+    auto trans_speed = std::make_unique<Signal>(
+      "TransmissionSpeed", 16, 16, true, false, 0.1, 0.0, 0.0, 6500.0, "rpm"
+    );
+    trans_speed->add_receiver("ECU1");
+    trans_speed->add_receiver("ECU3");
+    trans_msg->add_signal(std::move(trans_speed));
+    
+    db_->add_message(std::move(trans_msg));
   }
   
   void TearDown() override {

@@ -642,7 +642,7 @@ inline void Message::add_signal_group(std::unique_ptr<SignalGroup> group) {
 
 // Decoder options
 struct DecoderOptions {
-  bool ignore_unknown_ids = false;
+  bool ignore_unknown_ids = true;
   bool verbose = false;
 };
 

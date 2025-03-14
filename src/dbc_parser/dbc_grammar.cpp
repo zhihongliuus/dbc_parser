@@ -210,8 +210,86 @@ std::unique_ptr<Database> ParserContext::finalize() {
     database->add_node(std::move(node_ptr));
   }
   
-  // Placeholders for other data - will be implemented later
-  // We don't populate value tables and messages yet to avoid constructor issues
+  // Add messages
+  for (const auto& message : impl_->messages_) {
+    auto message_ptr = std::make_unique<Message>(message.id, message.name, message.length, message.sender);
+    
+    // Add signals to the message
+    for (const auto& signal : message.signals) {
+      auto signal_ptr = std::make_unique<Signal>(
+        signal.name, signal.start_bit, signal.length,
+        signal.is_little_endian, signal.is_signed,
+        signal.factor, signal.offset,
+        signal.min_value, signal.max_value,
+        signal.unit
+      );
+      
+      // Set signal properties
+      signal_ptr->set_mux_type(signal.mux_type);
+      signal_ptr->set_mux_value(signal.mux_value);
+      signal_ptr->set_extended_value_type(signal.extended_value_type);
+      
+      // Add receivers
+      for (const auto& receiver : signal.receivers) {
+        signal_ptr->add_receiver(receiver);
+      }
+      
+      // Add value descriptions
+      for (const auto& [value, desc] : signal.value_descriptions) {
+        signal_ptr->add_value_description(value, desc);
+      }
+      
+      // Set comment
+      if (!signal.comment.empty()) {
+        signal_ptr->set_comment(signal.comment);
+      }
+      
+      message_ptr->add_signal(std::move(signal_ptr));
+    }
+    
+    // Set message comment
+    if (!message.comment.empty()) {
+      message_ptr->set_comment(message.comment);
+    }
+    
+    // Add transmitters
+    for (const auto& transmitter : message.transmitters) {
+      message_ptr->add_transmitter(transmitter);
+    }
+    
+    database->add_message(std::move(message_ptr));
+  }
+  
+  // Add value tables
+  for (const auto& value_table : impl_->value_tables_) {
+    auto table_ptr = std::make_unique<ValueTable>(value_table.name);
+    
+    for (const auto& [value, desc] : value_table.values) {
+      table_ptr->add_value(value, desc);
+    }
+    
+    database->add_value_table(std::move(table_ptr));
+  }
+  
+  // Process comments
+  for (const auto& comment : impl_->comments_) {
+    if (comment.type == "BU_") {
+      database->set_node_comment(comment.node_name, comment.comment);
+    } else if (comment.type == "BO_") {
+      auto message = database->get_message(comment.message_id);
+      if (message) {
+        message->set_comment(comment.comment);
+      }
+    } else if (comment.type == "SG_") {
+      auto message = database->get_message(comment.message_id);
+      if (message) {
+        auto signal = message->get_signal(comment.signal_name);
+        if (signal) {
+          signal->set_comment(comment.comment);
+        }
+      }
+    }
+  }
   
   return database;
 }
