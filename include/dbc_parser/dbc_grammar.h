@@ -30,6 +30,17 @@ namespace dbc_parser {
 namespace qi = boost::spirit::qi;
 namespace phoenix = boost::phoenix;
 
+// BitTimingStruct definition
+struct BitTimingStruct {
+    BitTimingStruct() : baudrate(0), BTR1(0), BTR2(0) {}
+    BitTimingStruct(uint32_t b, uint32_t b1, uint32_t b2) 
+        : baudrate(b), BTR1(b1), BTR2(b2) {}
+    
+    uint32_t baudrate;
+    uint32_t BTR1;
+    uint32_t BTR2;
+};
+
 // Forward declarations
 class Database;
 
@@ -47,16 +58,6 @@ struct VersionStruct {
 
 struct NewSymbolsStruct {
     std::vector<std::string> symbols;
-};
-
-struct BitTimingStruct {
-    BitTimingStruct() : baudrate(0), BTR1(0), BTR2(0) {}
-    BitTimingStruct(uint32_t b, uint32_t b1, uint32_t b2) 
-        : baudrate(b), BTR1(b1), BTR2(b2) {}
-    
-    uint32_t baudrate;
-    uint32_t BTR1;
-    uint32_t BTR2;
 };
 
 struct NodeStruct {
@@ -236,31 +237,18 @@ private:
     qi::rule<Iterator, std::string(), qi::space_type> quoted_string;
     qi::rule<Iterator, qi::space_type> version_rule;
     qi::rule<Iterator, qi::space_type> new_symbols_rule;
-    qi::rule<Iterator, boost::spirit::qi::locals<uint32_t, uint32_t, uint32_t>, qi::space_type> bit_timing_rule;
+    qi::rule<Iterator, qi::space_type> bit_timing_rule;
     qi::rule<Iterator, qi::space_type> nodes_rule;
     qi::rule<Iterator, qi::space_type> value_tables_rule;
     qi::rule<Iterator, qi::space_type> messages_rule;
     qi::rule<Iterator, qi::space_type> message_transmitters_rule;
     qi::rule<Iterator, qi::space_type> environment_variables_rule;
-    qi::rule<Iterator, qi::space_type> environment_variables_data_rule;
-    qi::rule<Iterator, qi::space_type> signal_types_rule;
     qi::rule<Iterator, qi::space_type> comments_rule;
     qi::rule<Iterator, qi::space_type> attribute_definitions_rule;
     qi::rule<Iterator, qi::space_type> attribute_defaults_rule;
     qi::rule<Iterator, qi::space_type> attribute_values_rule;
     qi::rule<Iterator, qi::space_type> value_descriptions_rule;
-    qi::rule<Iterator, qi::space_type> signal_extended_value_type_list_rule;
-    qi::rule<Iterator, qi::space_type> signal_groups_rule;
-    qi::rule<Iterator, qi::space_type> signal_multiplexer_value_rule;
-    qi::rule<Iterator, qi::space_type> sigtype_attr_list_rule;
-    qi::rule<Iterator, qi::space_type> signal_type_refs_rule;
     qi::rule<Iterator, qi::space_type> start;
-    
-    // Callback functions
-    std::function<void(const std::string&)> on_version;
-    std::function<void(const std::vector<std::string>&)> on_new_symbols;
-    std::function<void(const BitTimingStruct&)> on_bit_timing;
-    std::function<void(const std::vector<std::string>&)> on_nodes;
     
     ParserContext& context_;
     ParserErrorHandler& error_handler_;

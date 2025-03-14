@@ -1,0 +1,39 @@
+VERSION "1.0"
+
+NS_:
+    CM_
+    BA_
+    VAL_
+    CAT_
+    EXT_
+
+BS_: 500000,1,2
+
+BU_: Node1 Node2 Node3
+
+BO_ 100 EngineData: 8 Node1
+ SG_ EngineSpeed : 0|16@1+ (0.1,0) [0|6500] "rpm" Node2
+ SG_ EngineTemp : 16|8@1+ (1,-40) [-40|215] "degC" Node2
+
+BO_ 200 TransmissionData: 8 Node1
+ SG_ GearPosition : 0|4@1+ (1,0) [0|8] "" Node2
+ SG_ TransmissionTemp : 8|8@1+ (1,-40) [-40|215] "degC" Node3
+
+CM_ BO_ 100 "Engine data message";
+CM_ SG_ 100 EngineSpeed "Engine rotational speed";
+
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_ BU_ "NodeLayerModules" STRING;
+BA_DEF_ "BusType" STRING;
+
+BA_DEF_DEF_ "GenMsgCycleTime" 100;
+BA_DEF_DEF_ "NodeLayerModules" "";
+BA_DEF_DEF_ "BusType" "CAN";
+
+BA_ "BusType" "CAN";
+BA_ "GenMsgCycleTime" BO_ 100 100;
+BA_ "GenMsgCycleTime" BO_ 200 200;
+
+VAL_ 200 GearPosition 0 "Neutral" 1 "First" 2 "Second" 3 "Third" 4 "Fourth" 5 "Fifth" 6 "Sixth" 7 "Seventh" 8 "Eighth" ;
+
+SIG_VALTYPE_ 100 EngineSpeed : 1; 

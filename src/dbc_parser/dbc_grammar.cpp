@@ -1,7 +1,7 @@
 #define BOOST_SPIRIT_USE_PHOENIX_V3
 #define BOOST_PHOENIX_NO_PREDEFINED_TERMINALS
-#include "../../include/dbc_parser/dbc_grammar.h"
-#include "../../include/dbc_parser/types.h"
+#include "dbc_parser/dbc_grammar.h"
+#include "dbc_parser/types.h"
 
 #include <fstream>
 #include <iostream>
@@ -30,17 +30,43 @@ namespace dbc_parser {
 
 namespace qi = boost::spirit::qi;
 namespace phoenix = boost::phoenix;
+namespace ascii = boost::spirit::ascii;
 
-// Bit timing handler
-struct bit_timing_handler {
-    ParserContext& context;
-    
-    bit_timing_handler(ParserContext& ctx) : context(ctx) {}
-    
-    void operator()(BitTimingStruct bit_timing) const {
-        context.set_bit_timing(bit_timing);
-    }
-};
+using qi::lit;
+using qi::lexeme;
+using qi::uint_;
+using qi::int_;
+using qi::double_;
+using qi::char_;
+using qi::_1;
+using qi::_2;
+using qi::_3;
+using qi::_4;
+using qi::_5;
+using qi::_6;
+using qi::_7;
+using qi::_8;
+using qi::_9;
+using qi::_val;
+using qi::eps;
+using qi::space;
+using qi::eol;
+using qi::eoi;
+using qi::skip;
+using qi::hold;
+using qi::omit;
+using qi::raw;
+using qi::repeat;
+using qi::no_skip;
+using qi::fail;
+using qi::on_error;
+using qi::expect;
+using phoenix::ref;
+using phoenix::push_back;
+using phoenix::construct;
+using phoenix::val;
+using phoenix::bind;
+using std::string;
 
 // Implementation of ParserContext
 class ParserContext::Impl {
@@ -154,8 +180,39 @@ void ParserContext::add_signal_type_ref(const SignalTypeRefStruct& signal_type_r
 std::unique_ptr<Database> ParserContext::finalize() {
   auto database = std::make_unique<Database>();
   
-  // Create and return an empty database for now
-  // The complete implementation of this method will be filled in later
+  // Set version
+  if (!impl_->version_.version_string.empty()) {
+    Database::Version version;
+    version.version = impl_->version_.version_string;
+    database->set_version(version);
+  }
+  
+  // Set bit timing
+  if (impl_->bit_timing_.baudrate > 0) {
+    Database::BitTiming bit_timing;
+    bit_timing.baudrate = impl_->bit_timing_.baudrate;
+    bit_timing.btr1 = impl_->bit_timing_.BTR1;
+    bit_timing.btr2 = impl_->bit_timing_.BTR2;
+    database->set_bit_timing(bit_timing);
+  }
+  
+  // Set new symbols
+  if (!impl_->new_symbols_.symbols.empty()) {
+    database->set_new_symbols(impl_->new_symbols_.symbols);
+  }
+  
+  // Add nodes
+  for (const auto& node : impl_->nodes_) {
+    auto node_ptr = std::make_unique<Node>(node.name);
+    if (!node.comment.empty()) {
+      node_ptr->set_comment(node.comment);
+    }
+    database->add_node(std::move(node_ptr));
+  }
+  
+  // Placeholders for other data - will be implemented later
+  // We don't populate value tables and messages yet to avoid constructor issues
+  
   return database;
 }
 
@@ -175,57 +232,66 @@ void DefaultParserErrorHandler::on_info(const std::string& message, int line, in
 template <typename Iterator, typename Skipper>
 DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context, ParserErrorHandler& error_handler)
     : DbcGrammar::base_type(start), context_(context), error_handler_(error_handler) {
-    
-    // Basic rules
-    identifier %= qi::lexeme[qi::alpha >> *(qi::alnum | qi::char_('_'))];
-    quoted_string %= qi::lexeme['"' >> *(qi::char_ - '"') >> '"'];
-    
-    // Version rule
-    version_rule = qi::lit("VERSION") > quoted_string
-      [phoenix::bind(&ParserContext::set_version, phoenix::ref(context), 
-        phoenix::construct<VersionStruct>(qi::_1))];
-    
-    // New symbols rule
-    new_symbols_rule = qi::lit("NS_:") > *(identifier
-      [phoenix::bind(&ParserContext::add_new_symbol, phoenix::ref(context), qi::_1)]);
-    
-    // Bit timing rule - simplified version without semantic actions
-    bit_timing_rule = qi::lit("BS_:") > qi::uint_ > qi::char_(',') > qi::uint_ > qi::char_(',') > qi::uint_;
-    
-    // Nodes rule
-    nodes_rule = qi::lit("BU_:") > *(identifier
-      [phoenix::bind([&](const std::string& name) {
-          NodeStruct node;
-          node.name = name;
-          context.add_node(node);
-        }, qi::_1)]);
-    
-    // More rule definitions follow...
-    
-    // Main grammar
-    start = 
-      version_rule > 
-      -new_symbols_rule >
-      -bit_timing_rule >
-      nodes_rule;
-      /* Comment out these rules until we fix them
-      *(value_tables_rule | 
-        messages_rule | 
-        message_transmitters_rule | 
-        environment_variables_rule | 
-        environment_variables_data_rule | 
-        signal_types_rule | 
-        comments_rule | 
-        attribute_definitions_rule | 
-        attribute_defaults_rule | 
-        attribute_values_rule | 
-        value_descriptions_rule | 
-        signal_extended_value_type_list_rule | 
-        signal_groups_rule | 
-        signal_multiplexer_value_rule | 
-        sigtype_attr_list_rule | 
-        signal_type_refs_rule);
-      */
+  // Define the rules for parsing a DBC file
+  
+  // Basic rules
+  identifier %= lexeme[char_("a-zA-Z_") > *char_("a-zA-Z0-9_")];
+  quoted_string %= lexeme['"' > *(char_ - '"') > '"'];
+
+  // Version rule
+  version_rule = lit("VERSION") > quoted_string;
+  
+  // New symbols rule
+  new_symbols_rule = lit("NS_:") > *identifier;
+
+  // Bit timing rule
+  bit_timing_rule = lit("BS_:") > uint_ > ',' > uint_ > ',' > uint_;
+
+  // Nodes rule
+  nodes_rule = lit("BU_:") > *identifier;
+
+  // Value tables rule - simple placeholder
+  value_tables_rule = lit("VAL_TABLE_") > identifier > *(int_ > quoted_string) > char_(';');
+
+  // Messages rule - simple placeholder
+  messages_rule = lit("BO_") > uint_ > identifier > char_(':') > uint_ > identifier > char_(';');
+  
+  // Message transmitters rule - simple placeholder 
+  message_transmitters_rule = lit("BO_TX_BU_") > uint_ > char_(':') > *(identifier) > char_(';');
+  
+  // Environment variables rule - simple placeholder
+  environment_variables_rule = lit("EV_") > identifier > char_(':') > uint_ > *(char_) > char_(';');
+
+  // Comments rule - simple placeholder
+  comments_rule = lit("CM_") > *(char_ - char_(';')) > char_(';');
+
+  // Attribute definitions rule - simple placeholder
+  attribute_definitions_rule = lit("BA_DEF_") > *(char_ - char_(';')) > char_(';');
+
+  // Attribute defaults rule - simple placeholder
+  attribute_defaults_rule = lit("BA_DEF_DEF_") > *(char_ - char_(';')) > char_(';');
+
+  // Attribute values rule - simple placeholder
+  attribute_values_rule = lit("BA_") > *(char_ - char_(';')) > char_(';');
+
+  // Value descriptions rule - simple placeholder
+  value_descriptions_rule = lit("VAL_") > *(char_ - char_(';')) > char_(';');
+
+  // Main grammar
+  start = 
+    -(version_rule) > 
+    -(new_symbols_rule) >
+    -(bit_timing_rule) >
+    -(nodes_rule) >
+    *(value_tables_rule | 
+      messages_rule | 
+      message_transmitters_rule | 
+      environment_variables_rule | 
+      comments_rule | 
+      attribute_definitions_rule | 
+      attribute_defaults_rule | 
+      attribute_values_rule | 
+      value_descriptions_rule);
 }
 
 // Explicit template instantiation

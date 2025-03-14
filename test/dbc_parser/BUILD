@@ -15,7 +15,7 @@ cc_test(
         "@googletest//:gtest_main",
     ],
     data = [
-        "test.dbc",
+        ":sample_files",
     ],
     copts = [
         "-std=c++17",
@@ -90,15 +90,16 @@ cc_test(
     ],
 )
 
-cc_test(
-    name = "dbc_components_test",
-    srcs = ["dbc_components_test.cpp"],
-    deps = [
-        "//:dbc_parser",
-        "@googletest//:gtest_main",
-    ],
-    copts = [
-        "-std=c++17",
-        "-DBOOST_PHOENIX_STL_TUPLE_H_",
-    ],
-)
+# Commented out because the test file doesn't exist
+# cc_test(
+#     name = "dbc_components_test",
+#     srcs = ["dbc_components_test.cpp"],
+#     deps = [
+#         "//:dbc_parser",
+#         "@googletest//:gtest_main",
+#     ],
+#     copts = [
+#         "-std=c++17",
+#         "-DBOOST_PHOENIX_STL_TUPLE_H_",
+#     ],
+# )

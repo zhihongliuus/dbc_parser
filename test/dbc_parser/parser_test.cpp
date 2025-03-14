@@ -18,7 +18,7 @@ class DbcParserTest : public ::testing::Test {
  protected:
   void SetUp() override {
     // Load test DBC file
-    std::ifstream file("test/dbc_parser/test.dbc");
+    std::ifstream file("test/dbc_parser/samples/test.dbc");
     ASSERT_TRUE(file.is_open()) << "Failed to open test.dbc file";
     
     std::stringstream buffer;
