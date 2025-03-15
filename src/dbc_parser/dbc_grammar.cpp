@@ -19,6 +19,16 @@
 
 #include "dbc_parser/types.h"
 
+// Free function for error handling
+template <typename Iterator>
+boost::spirit::qi::error_handler_result handle_error(
+    Iterator first, Iterator last, Iterator where,
+    const boost::spirit::info& what) {
+  std::cerr << "Error: expecting " << what.tag << " at "
+            << std::string(where, last) << std::endl;
+  return boost::spirit::qi::fail;
+}
+
 namespace dbc_parser {
 
 // Implementation of DefaultParserErrorHandler
@@ -291,10 +301,11 @@ BOOST_FUSION_ADAPT_STRUCT(dbc_parser::ValueTableStruct, (std::string, name))
 // Adapt only the necessary fields for SignalStruct
 BOOST_FUSION_ADAPT_STRUCT(
     dbc_parser::SignalStruct,
-    (std::string, name)(uint32_t, start_bit)(uint32_t, length)(
-        bool, is_little_endian)(bool, is_signed)(double, factor)(
-        double, offset)(double, min_value)(double, max_value)(std::string,
-                                                              unit))
+    (std::string, name)(uint32_t, start_bit)(uint32_t,
+                                             length)(bool, is_little_endian)(
+        bool, is_signed)(double, factor)(double, offset)(double, min_value)(
+        double, max_value)(std::string, unit)(dbc_parser::MultiplexerType,
+                                              mux_type)(uint32_t, mux_value))
 
 // Adapt only the necessary fields for MessageStruct
 BOOST_FUSION_ADAPT_STRUCT(dbc_parser::MessageStruct,
@@ -400,30 +411,40 @@ DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context,
       &ParserContext::add_value_table, phoenix::ref(context_), _1)]);
   value_tables_rule.name("value_tables_rule");
 
-  // Signal definition
-  signal_def = lit("SG_") >> identifier[phoenix::at_c<0>(_val) = _1] >>
-               // Skip multiplexing for now
-               lit(":") >>
-               // Start bit, length, endianness, signedness
-               uint_[phoenix::at_c<1>(_val) = _1] >> lit("|") >>
-               uint_[phoenix::at_c<2>(_val) = _1] >> lit("@") >>
-               uint_ >>  // Byte order (always 1 in DBC)
-               (lit("+")[phoenix::at_c<3>(_val) = true] |
-                lit("-")[phoenix::at_c<3>(_val) = false]) >>
-               (lit("+")[phoenix::at_c<4>(_val) = false] |
-                lit("-")[phoenix::at_c<4>(_val) = true]) >>
-               // Factor, offset, min, max, unit
-               lit("(") >> double_[phoenix::at_c<5>(_val) = _1] >> lit(",") >>
-               double_[phoenix::at_c<6>(_val) = _1] >> lit(")") >> lit("[") >>
-               double_[phoenix::at_c<7>(_val) = _1] >> lit("|") >>
-               double_[phoenix::at_c<8>(_val) = _1] >> lit("]") >>
-               quoted_string[phoenix::at_c<9>(_val) = _1] >>
-               // Receivers
-               *identifier[phoenix::bind(
-                   [](SignalStruct& signal, const std::string& receiver) {
-                     signal.receivers.push_back(receiver);
-                   },
-                   _val, _1)];
+  // Signal definition with proper multiplexing support
+  signal_def =
+      lit("SG_") >> identifier[phoenix::at_c<0>(_val) = _1] >>
+      // Handle multiplexing
+      (
+          // Multiplexor signal
+          (lit("M") >> lit(":") >>
+           eps[phoenix::at_c<10>(_val) = MultiplexerType::kMultiplexor]) |
+          // Multiplexed signal
+          (lit("m") >> uint_[phoenix::at_c<11>(_val) = _1] >> lit(":") >>
+           eps[phoenix::at_c<10>(_val) = MultiplexerType::kMultiplexed]) |
+          // Regular signal
+          (lit(":") >>
+           eps[phoenix::at_c<10>(_val) = MultiplexerType::kNone])) >>
+      // Start bit, length, endianness, signedness
+      uint_[phoenix::at_c<1>(_val) = _1] >> lit("|") >>
+      uint_[phoenix::at_c<2>(_val) = _1] >> lit("@") >>
+      uint_ >>  // Byte order (always 1 in DBC)
+      (lit("+")[phoenix::at_c<3>(_val) = true] |
+       lit("-")[phoenix::at_c<3>(_val) = false]) >>
+      (lit("+")[phoenix::at_c<4>(_val) = false] |
+       lit("-")[phoenix::at_c<4>(_val) = true]) >>
+      // Factor, offset, min, max, unit
+      lit("(") >> double_[phoenix::at_c<5>(_val) = _1] >> lit(",") >>
+      double_[phoenix::at_c<6>(_val) = _1] >> lit(")") >> lit("[") >>
+      double_[phoenix::at_c<7>(_val) = _1] >> lit("|") >>
+      double_[phoenix::at_c<8>(_val) = _1] >> lit("]") >>
+      quoted_string[phoenix::at_c<9>(_val) = _1] >>
+      // Receivers
+      *identifier[phoenix::bind(
+          [](SignalStruct& signal, const std::string& receiver) {
+            signal.receivers.push_back(receiver);
+          },
+          _val, _1)];
   signal_def.name("signal_def");
 
   // Message definition
@@ -537,7 +558,9 @@ DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context,
              signal_groups_rule >> signal_type_refs_rule;
   dbc_file.name("dbc_file");
 
-  // No error handling for now
+  // Error handling with phoenix::bind to a free function
+  on_error<boost::spirit::qi::fail>(
+      dbc_file, phoenix::bind(&handle_error<Iterator>, _1, _2, _3, _4));
 }
 
 }  // namespace dbc_parser
