@@ -169,7 +169,9 @@ std::unique_ptr<Database> ParserContext::finalize() {
   }
 
   // Set new symbols
-  db->set_new_symbols(impl_->new_symbols);
+  if (!impl_->new_symbols.empty()) {
+    db->set_new_symbols(impl_->new_symbols);
+  }
 
   // Set bit timing
   if (impl_->bit_timing.baudrate > 0) {
@@ -202,6 +204,37 @@ std::unique_ptr<Database> ParserContext::finalize() {
                                                 message.length, message.sender);
     db_message->set_comment(message.comment);
 
+    // Add signals to message
+    for (const auto& signal : message.signals) {
+      auto db_signal = std::make_unique<Signal>(
+          signal.name, signal.start_bit, signal.length, signal.is_little_endian,
+          signal.is_signed, signal.factor, signal.offset, signal.min_value,
+          signal.max_value, signal.unit);
+
+      // Set multiplexing info
+      db_signal->set_mux_type(signal.mux_type);
+      db_signal->set_mux_value(signal.mux_value);
+
+      // Add receivers
+      for (const auto& receiver : signal.receivers) {
+        db_signal->add_receiver(receiver);
+      }
+
+      // Add value descriptions
+      for (const auto& [value, desc] : signal.value_descriptions) {
+        db_signal->add_value_description(value, desc);
+      }
+
+      // Set comment
+      db_signal->set_comment(signal.comment);
+
+      // Set extended value type
+      db_signal->set_extended_value_type(signal.extended_value_type);
+
+      // Add signal to message
+      db_message->add_signal(std::move(db_signal));
+    }
+
     // Add transmitters to message
     for (const auto& transmitter : message.transmitters) {
       db_message->add_transmitter(transmitter);
@@ -226,6 +259,7 @@ std::unique_ptr<Database> ParserContext::finalize() {
   for (const auto& env_var : impl_->environment_variables) {
     // In a real implementation, we would create EnvironmentVariable objects
     // here and add them to the database
+    (void)env_var;  // Suppress unused variable warning
   }
 
   // Add comments
@@ -365,8 +399,12 @@ DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context,
   // Version rule
   version_rule =
       lit("VERSION") >> quoted_string[phoenix::bind(
-                            &ParserContext::set_version, phoenix::ref(context_),
-                            phoenix::construct<VersionStruct>(_1))];
+                            [](ParserContext& ctx, const std::string& version) {
+                              VersionStruct vs;
+                              vs.version_string = version;
+                              ctx.set_version(vs);
+                            },
+                            phoenix::ref(context_), _1)];
   version_rule.name("version_rule");
 
   // New symbols rule
@@ -451,7 +489,12 @@ DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context,
   message_def = lit("BO_") >> uint_[phoenix::at_c<0>(_val) = _1] >>
                 identifier[phoenix::at_c<1>(_val) = _1] >> lit(":") >>
                 uint_[phoenix::at_c<2>(_val) = _1] >>
-                identifier[phoenix::at_c<3>(_val) = _1];
+                identifier[phoenix::at_c<3>(_val) = _1] >>
+                *(signal_def[phoenix::bind(
+                    [](MessageStruct& msg, const SignalStruct& signal) {
+                      msg.signals.push_back(signal);
+                    },
+                    _val, _1)]);
   message_def.name("message_def");
 
   // Messages rule
@@ -486,13 +529,51 @@ DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context,
            qi::space_type>
       comments_rule_with_locals =
           lit("CM_") >>
-          ((lit("BU_") >> identifier[_a = "BU_", _c = _1] >> quoted_string) |
-           (lit("BO_") >> uint_[_a = "BO_", _b = _1] >> quoted_string) |
+          ((lit("BU_") >> identifier[_a = "BU_", _c = _1] >>
+            quoted_string[phoenix::bind(
+                [](ParserContext& ctx, const std::string& type, uint32_t msg_id,
+                   const std::string& name, const std::string& comment) {
+                  CommentStruct cs;
+                  cs.type = type;
+                  cs.message_id = msg_id;
+                  cs.node_name = name;
+                  cs.comment = comment;
+                  ctx.add_comment(cs);
+                },
+                phoenix::ref(context_), _a, _b, _c, _1)]) |
+           (lit("BO_") >> uint_[_a = "BO_", _b = _1] >>
+            quoted_string[phoenix::bind(
+                [](ParserContext& ctx, const std::string& type, uint32_t msg_id,
+                   const std::string& name, const std::string& comment) {
+                  CommentStruct cs;
+                  cs.type = type;
+                  cs.message_id = msg_id;
+                  cs.node_name = name;
+                  cs.comment = comment;
+                  ctx.add_comment(cs);
+                },
+                phoenix::ref(context_), _a, _b, _c, _1)]) |
            (lit("SG_") >> uint_[_a = "SG_", _b = _1] >> identifier[_c = _1] >>
-            quoted_string) |
-           (quoted_string[_a = "", _b = 0, _c = ""]));
+            quoted_string[phoenix::bind(
+                [](ParserContext& ctx, const std::string& type, uint32_t msg_id,
+                   const std::string& name, const std::string& comment) {
+                  CommentStruct cs;
+                  cs.type = type;
+                  cs.message_id = msg_id;
+                  cs.signal_name = name;
+                  cs.comment = comment;
+                  ctx.add_comment(cs);
+                },
+                phoenix::ref(context_), _a, _b, _c, _1)]) |
+           (quoted_string[phoenix::bind(
+               [](ParserContext& ctx, const std::string& comment) {
+                 CommentStruct cs;
+                 cs.comment = comment;
+                 ctx.add_comment(cs);
+               },
+               phoenix::ref(context_), _1)]));
 
-  comments_rule = *comments_rule_with_locals;
+  comments_rule = *(comments_rule_with_locals >> lit(";"));
   comments_rule.name("comments_rule");
 
   // Attribute definitions rule - simplified
@@ -548,14 +629,14 @@ DbcGrammar<Iterator, Skipper>::DbcGrammar(ParserContext& context,
   signal_type_refs_rule.name("signal_type_refs_rule");
 
   // DBC file - complete grammar with all rules
-  dbc_file = version_rule >> new_symbols_rule >> bit_timing_rule >>
-             nodes_rule >> value_tables_rule >> messages_rule >>
-             message_transmitters_rule >> environment_variables_rule >>
-             environment_variables_data_rule >> signal_types_rule >>
-             comments_rule >> attribute_definitions_rule >>
-             attribute_defaults_rule >> attribute_values_rule >>
-             value_descriptions_rule >> signal_extended_value_types_rule >>
-             signal_groups_rule >> signal_type_refs_rule;
+  dbc_file = -version_rule >> -new_symbols_rule >> -bit_timing_rule >>
+             -nodes_rule >> -value_tables_rule >> -messages_rule >>
+             -message_transmitters_rule >> -environment_variables_rule >>
+             -environment_variables_data_rule >> -signal_types_rule >>
+             -comments_rule >> -attribute_definitions_rule >>
+             -attribute_defaults_rule >> -attribute_values_rule >>
+             -value_descriptions_rule >> -signal_extended_value_types_rule >>
+             -signal_groups_rule >> -signal_type_refs_rule;
   dbc_file.name("dbc_file");
 
   // Error handling with phoenix::bind to a free function

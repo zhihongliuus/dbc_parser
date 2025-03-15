@@ -1,78 +1,126 @@
 #include "dbc_parser/parser.h"
-#include "dbc_parser/dbc_grammar.h"
-#include "dbc_parser/types.h"
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-#include <filesystem>
 #include <string>
+
+#include "dbc_parser/dbc_grammar.h"
+#include "dbc_parser/types.h"
 
 namespace dbc_parser {
 
 class DbcParser::Impl {
-public:
+ public:
   Impl() = default;
-  
-  std::unique_ptr<Database> parse_file(const std::string& filename, const ParserOptions& options) {
+
+  std::unique_ptr<Database> parse_file(const std::string& filename,
+                                       const ParserOptions& options) {
     // Check if file exists
     if (!std::filesystem::exists(filename)) {
       throw std::runtime_error("File not found: " + filename);
     }
-    
+
     // Read file content
     std::ifstream file(filename);
     if (!file.is_open()) {
       throw std::runtime_error("Failed to open file: " + filename);
     }
-    
+
     std::stringstream buffer;
     buffer << file.rdbuf();
     return parse(buffer.str(), options);
   }
-  
-  std::unique_ptr<Database> parse(const std::string& content, const ParserOptions& options) {
+
+  std::unique_ptr<Database> parse(const std::string& content,
+                                  const ParserOptions& options) {
     ParserContext context;
     DefaultParserErrorHandler error_handler;
-    
+
     using iterator_type = std::string::const_iterator;
-    DbcGrammar<iterator_type> grammar(context, error_handler);
-    
-    bool result = qi::phrase_parse(
-        content.begin(), content.end(),
-        grammar,
-        qi::space
-    );
-    
-    if (!result) {
-      throw std::runtime_error("Failed to parse DBC content");
+
+    if (options.verbose) {
+      std::cerr << "Starting to parse DBC content of length: " << content.size()
+                << std::endl;
+      std::cerr << "First 100 characters: " << content.substr(0, 100)
+                << std::endl;
     }
-    
-    return context.finalize();
+
+    try {
+      DbcGrammar<iterator_type> grammar(context, error_handler);
+
+      auto iter = content.begin();
+      auto end = content.end();
+
+      if (options.verbose) {
+        std::cerr << "Created grammar, starting parsing..." << std::endl;
+      }
+
+      bool result = qi::phrase_parse(iter, end, grammar, qi::space);
+
+      if (options.verbose) {
+        std::cerr << "Parsing completed with result: "
+                  << (result ? "success" : "failure") << std::endl;
+        std::cerr << "Distance from current position to end: "
+                  << std::distance(iter, end) << std::endl;
+        if (iter != end) {
+          std::cerr << "Stopped at: "
+                    << std::string(iter, std::min(iter + 30, end)) << "..."
+                    << std::endl;
+        }
+      }
+
+      if (!result || iter != end) {
+        if (options.verbose) {
+          std::cerr << "Parsing failed. Stopped at: "
+                    << std::string(iter, std::min(iter + 30, end)) << "..."
+                    << std::endl;
+        }
+        throw std::runtime_error("Failed to parse DBC content");
+      }
+
+      if (options.verbose) {
+        std::cerr << "Finalizing parser context..." << std::endl;
+      }
+
+      auto db = context.finalize();
+
+      if (options.verbose) {
+        std::cerr << "Parser context finalized successfully." << std::endl;
+      }
+
+      return db;
+    } catch (const std::exception& e) {
+      if (options.verbose) {
+        std::cerr << "Exception during parsing: " << e.what() << std::endl;
+      }
+      throw;
+    }
   }
-  
+
   bool write_file(const Database& db, const std::string& filename) {
     try {
       std::ofstream file(filename);
       if (!file.is_open()) {
         return false;
       }
-      
+
       file << write_string(db);
       return true;
     } catch (...) {
       return false;
     }
   }
-  
+
   std::string write_string(const Database& db) {
     std::stringstream ss;
-    
+
     // Write version
     if (db.version()) {
       ss << "VERSION \"" << db.version()->version << "\"\n\n";
     }
-    
+
     // Write new symbols
     ss << "NS_ :\n"
        << "    NS_DESC_\n"
@@ -103,44 +151,43 @@ public:
        << "    BU_EV_REL_\n"
        << "    BU_BO_REL_\n"
        << "    SG_MUL_VAL_\n\n";
-    
+
     // Write bit timing
     if (db.bit_timing()) {
-      ss << "BS_: " << db.bit_timing()->baudrate << ","
-         << db.bit_timing()->btr1 << ","
-         << db.bit_timing()->btr2 << "\n\n";
+      ss << "BS_: " << db.bit_timing()->baudrate << "," << db.bit_timing()->btr1
+         << "," << db.bit_timing()->btr2 << "\n\n";
     }
-    
+
     // Write nodes
     ss << "BU_:";
     for (const auto& node : db.nodes()) {
       ss << " " << node->name();
     }
     ss << "\n\n";
-    
+
     // Write messages and signals
     for (const auto& message : db.messages()) {
       ss << "BO_ " << message->id() << " " << message->name() << ": "
          << message->length() << " " << message->sender() << "\n";
-      
+
       // Write signals
       for (const auto& [name, signal] : message->signals()) {
         ss << " SG_ " << signal->name() << " ";
-        
+
         // Handle multiplexing
         if (signal->mux_type() == MultiplexerType::kMultiplexor) {
           ss << "M ";
         } else if (signal->mux_type() == MultiplexerType::kMultiplexed) {
           ss << "m" << signal->mux_value() << " ";
         }
-        
+
         ss << ": " << signal->start_bit() << "|" << signal->length() << "@1";
         ss << (signal->is_little_endian() ? "+" : "-");
         ss << (signal->is_signed() ? "-" : "+");
         ss << " (" << signal->factor() << "," << signal->offset() << ")";
         ss << " [" << signal->min_value() << "|" << signal->max_value() << "]";
         ss << " \"" << signal->unit() << "\"";
-        
+
         // Write receivers
         for (const auto& receiver : signal->receivers()) {
           ss << " " << receiver;
@@ -149,29 +196,30 @@ public:
       }
       ss << "\n";
     }
-    
+
     // Write comments
     for (const auto& node : db.nodes()) {
       if (!node->comment().empty()) {
         ss << "CM_ BU_ " << node->name() << " \"" << node->comment() << "\";\n";
       }
     }
-    
+
     for (const auto& message : db.messages()) {
       if (!message->comment().empty()) {
-        ss << "CM_ BO_ " << message->id() << " \"" << message->comment() << "\";\n";
+        ss << "CM_ BO_ " << message->id() << " \"" << message->comment()
+           << "\";\n";
       }
-      
+
       // Write signal comments
       for (const auto& [name, signal] : message->signals()) {
         if (!signal->comment().empty()) {
-          ss << "CM_ SG_ " << message->id() << " " << signal->name() 
-             << " \"" << signal->comment() << "\";\n";
+          ss << "CM_ SG_ " << message->id() << " " << signal->name() << " \""
+             << signal->comment() << "\";\n";
         }
       }
     }
     ss << "\n";
-    
+
     // Write attribute definitions
     ss << "BA_DEF_ SG_ \"SignalType\" STRING ;\n";
     ss << "BA_DEF_ BO_ \"GenMsgCycleTime\" INT 0 10000;\n";
@@ -179,7 +227,7 @@ public:
     ss << "BA_DEF_DEF_ \"GenMsgCycleTime\" 100;\n";
     ss << "BA_ \"GenMsgCycleTime\" BO_ 100 100;\n";
     ss << "BA_ \"GenMsgCycleTime\" BO_ 200 200;\n\n";
-    
+
     // Write value descriptions
     for (const auto& message : db.messages()) {
       for (const auto& [name, signal] : message->signals()) {
@@ -193,7 +241,7 @@ public:
         }
       }
     }
-    
+
     return ss.str();
   }
 };
@@ -201,11 +249,13 @@ public:
 DbcParser::DbcParser() : impl_(std::make_unique<Impl>()) {}
 DbcParser::~DbcParser() = default;
 
-std::unique_ptr<Database> DbcParser::parse_file(const std::string& filename, const ParserOptions& options) {
+std::unique_ptr<Database> DbcParser::parse_file(const std::string& filename,
+                                                const ParserOptions& options) {
   return impl_->parse_file(filename, options);
 }
 
-std::unique_ptr<Database> DbcParser::parse_string(const std::string& content, const ParserOptions& options) {
+std::unique_ptr<Database> DbcParser::parse_string(
+    const std::string& content, const ParserOptions& options) {
   return impl_->parse(content, options);
 }
 
@@ -218,18 +268,19 @@ std::string DbcParser::write_string(const Database& db) {
 }
 
 // ParserFactory implementation
-std::unique_ptr<DbcParser> ParserFactory::create_parser(const std::string& filename) {
+std::unique_ptr<DbcParser> ParserFactory::create_parser(
+    const std::string& filename) {
   // Get file extension
   std::string extension = filename.substr(filename.find_last_of(".") + 1);
-  
+
   // Convert to lowercase
   std::transform(extension.begin(), extension.end(), extension.begin(),
                  [](unsigned char c) { return std::tolower(c); });
-  
+
   if (extension == "dbc") {
     return create_dbc_parser();
   }
-  
+
   throw std::runtime_error("Unsupported file extension: " + extension);
 }
 
@@ -237,4 +288,4 @@ std::unique_ptr<DbcParser> ParserFactory::create_dbc_parser() {
   return std::make_unique<DbcParser>();
 }
 
-} // namespace dbc_parser 
+}  // namespace dbc_parser
