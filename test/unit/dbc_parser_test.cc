@@ -198,6 +198,157 @@ TEST(DbcParserTest, ParseSignalDetails) {
   std::remove(temp_file.c_str());
 }
 
+TEST(DbcParserTest, ParseComments) {
+  // Create a temporary DBC file with comments
+  std::string temp_file = "test_comments.dbc";
+  {
+    std::ofstream file(temp_file);
+    file << "BU_: ECU1 ECU2 ECU3" << std::endl;
+    file << "BO_ 100 EngineStatus: 8 ECU1" << std::endl;
+    file << " SG_ EngineSpeed : 0|16@1+ (0.1,0) [0|6500] \"rpm\" ECU2" << std::endl;
+    file << " SG_ EngineTemp : 16|8@1+ (1,-40) [-40|215] \"C\" ECU2" << std::endl;
+    file << "CM_ BO_ 100 \"Engine status message\"; " << std::endl;
+    file << "CM_ SG_ 100 EngineSpeed \"Engine speed in revolutions per minute\"; " << std::endl;
+    file << "CM_ BU_ ECU1 \"Engine Control Unit\"; " << std::endl;
+  }
+  
+  // Parse the file
+  DbcParser parser;
+  std::unique_ptr<DbcFile> dbc_file;
+  int result = parser.Parse(temp_file, &dbc_file);
+  
+  // Verify results
+  EXPECT_EQ(0, result);
+  const auto& messages = dbc_file->GetMessages();
+  EXPECT_EQ(1, messages.size());
+  
+  // Check message comment
+  EXPECT_EQ("Engine status message", messages[0].comment);
+  
+  // Check signal comment
+  EXPECT_EQ("Engine speed in revolutions per minute", messages[0].signals[0].comment);
+  
+  // Check node comment (assuming we have a way to get nodes by name)
+  bool found_node = false;
+  for (const auto& node : dbc_file->GetNodes()) {
+    if (node.name == "ECU1") {
+      EXPECT_EQ("Engine Control Unit", node.comment);
+      found_node = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_node);
+  
+  // Clean up
+  std::remove(temp_file.c_str());
+}
+
+TEST(DbcParserTest, ParseValueDescriptions) {
+  // Create a temporary DBC file with value descriptions
+  std::string temp_file = "test_value_descriptions.dbc";
+  {
+    std::ofstream file(temp_file);
+    file << "BO_ 100 EngineStatus: 8 ECU1" << std::endl;
+    file << " SG_ EngineState : 0|2@1+ (1,0) [0|3] \"\" ECU2" << std::endl;
+    file << "VAL_ 100 EngineState 0 \"Off\" 1 \"Idle\" 2 \"Running\" 3 \"Error\";" << std::endl;
+  }
+  
+  // Parse the file
+  DbcParser parser;
+  std::unique_ptr<DbcFile> dbc_file;
+  int result = parser.Parse(temp_file, &dbc_file);
+  
+  // Verify results
+  EXPECT_EQ(0, result);
+  const auto& messages = dbc_file->GetMessages();
+  EXPECT_EQ(1, messages.size());
+  
+  // Check if the message has the signal
+  EXPECT_EQ(1, messages[0].signals.size());
+  
+  // Check value descriptions
+  const auto& value_descriptions = messages[0].signals[0].value_descriptions;
+  EXPECT_EQ(4, value_descriptions.size());
+  EXPECT_EQ("Off", value_descriptions.at(0));
+  EXPECT_EQ("Idle", value_descriptions.at(1));
+  EXPECT_EQ("Running", value_descriptions.at(2));
+  EXPECT_EQ("Error", value_descriptions.at(3));
+  
+  // Clean up
+  std::remove(temp_file.c_str());
+}
+
+TEST(DbcParserTest, ParseMultiplexedSignals) {
+  // Create a temporary DBC file with multiplexed signals
+  std::string temp_file = "test_multiplexed_signals.dbc";
+  {
+    std::ofstream file(temp_file);
+    file << "BO_ 100 EngineStatus: 8 ECU1" << std::endl;
+    file << " SG_ MuxSelector M : 0|3@1+ (1,0) [0|7] \"\" ECU2" << std::endl;
+    file << " SG_ EngineSpeed m0 : 8|16@1+ (0.1,0) [0|6500] \"rpm\" ECU2" << std::endl;
+    file << " SG_ EngineTemp m0 : 24|8@1+ (1,-40) [-40|215] \"C\" ECU2" << std::endl;
+    file << " SG_ FuelLevel m1 : 8|8@1+ (1,0) [0|100] \"%\" ECU2" << std::endl;
+    file << " SG_ FuelPressure m1 : 16|16@1+ (0.1,0) [0|6500] \"kPa\" ECU2" << std::endl;
+  }
+  
+  // Parse the file
+  DbcParser parser;
+  std::unique_ptr<DbcFile> dbc_file;
+  int result = parser.Parse(temp_file, &dbc_file);
+  
+  // Verify results
+  EXPECT_EQ(0, result);
+  const auto& messages = dbc_file->GetMessages();
+  EXPECT_EQ(1, messages.size());
+  
+  // Check multiplexer signal
+  const auto& signals = messages[0].signals;
+  bool found_multiplexer = false;
+  for (const auto& signal : signals) {
+    if (signal.name == "MuxSelector") {
+      found_multiplexer = true;
+      EXPECT_TRUE(signal.is_multiplexer);
+      EXPECT_EQ(-1, signal.multiplexer_value); // -1 indicates that it's a multiplexer
+      break;
+    }
+  }
+  EXPECT_TRUE(found_multiplexer);
+  
+  // Check multiplexed signals
+  bool found_engine_speed = false;
+  bool found_engine_temp = false;
+  bool found_fuel_level = false;
+  bool found_fuel_pressure = false;
+  
+  for (const auto& signal : signals) {
+    if (signal.name == "EngineSpeed") {
+      found_engine_speed = true;
+      EXPECT_FALSE(signal.is_multiplexer);
+      EXPECT_EQ(0, signal.multiplexer_value);
+    } else if (signal.name == "EngineTemp") {
+      found_engine_temp = true;
+      EXPECT_FALSE(signal.is_multiplexer);
+      EXPECT_EQ(0, signal.multiplexer_value);
+    } else if (signal.name == "FuelLevel") {
+      found_fuel_level = true;
+      EXPECT_FALSE(signal.is_multiplexer);
+      EXPECT_EQ(1, signal.multiplexer_value);
+    } else if (signal.name == "FuelPressure") {
+      found_fuel_pressure = true;
+      EXPECT_FALSE(signal.is_multiplexer);
+      EXPECT_EQ(1, signal.multiplexer_value);
+    }
+  }
+  
+  EXPECT_TRUE(found_engine_speed);
+  EXPECT_TRUE(found_engine_temp);
+  EXPECT_TRUE(found_fuel_level);
+  EXPECT_TRUE(found_fuel_pressure);
+  
+  // Clean up
+  std::remove(temp_file.c_str());
+}
+
 // More tests will be added as the implementation progresses
 
 }  // namespace

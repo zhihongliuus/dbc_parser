@@ -27,6 +27,10 @@ const std::vector<Node>& DbcFile::GetNodes() const {
   return nodes_;
 }
 
+std::vector<Node>& DbcFile::GetMutableNodes() {
+  return nodes_;
+}
+
 void DbcFile::AddNode(const Node& node) {
   nodes_.push_back(node);
 }
@@ -38,6 +42,10 @@ void DbcFile::AddNode(const std::string& name) {
 }
 
 const std::vector<Message>& DbcFile::GetMessages() const {
+  return messages_;
+}
+
+std::vector<Message>& DbcFile::GetMutableMessages() {
   return messages_;
 }
 
@@ -65,14 +73,45 @@ bool ParseSignalLine(const std::string& line, Signal* signal) {
   
   // Extract signal name
   size_t name_start = line.find(" SG_ ") + 5;
-  size_t name_end = line.find(" :", name_start);
+  size_t name_end = line.find(" ", name_start);
   if (name_end == std::string::npos) {
     return false;
   }
   signal->name = line.substr(name_start, name_end - name_start);
   
+  // Check for multiplexing
+  size_t mux_start = name_end + 1;
+  if (mux_start < line.length()) {
+    char mux_type = line[mux_start];
+    
+    // Check for multiplexer signal
+    if (mux_type == 'M') {
+      signal->is_multiplexer = true;
+      signal->multiplexer_value = -1;  // -1 indicates this is the multiplexer
+      
+      // Skip the multiplexer flag
+      if (line[mux_start + 1] == ' ') {
+        mux_start += 2;  // Skip "M "
+      } else {
+        mux_start += 1;  // Skip "M"
+      }
+    } 
+    // Check for multiplexed signal
+    else if (mux_type == 'm') {
+      size_t mux_value_end = line.find(" ", mux_start + 1);
+      if (mux_value_end != std::string::npos) {
+        // Extract the multiplexer value (m0, m1, etc.)
+        std::string mux_value_str = line.substr(mux_start + 1, mux_value_end - mux_start - 1);
+        signal->multiplexer_value = std::stoi(mux_value_str);
+        
+        // Skip to the next part
+        mux_start = mux_value_end + 1;
+      }
+    }
+  }
+  
   // Extract start bit and length
-  size_t bit_info_start = line.find(":", name_end) + 1;
+  size_t bit_info_start = line.find(":", mux_start) + 1;
   size_t bit_info_end = line.find("@", bit_info_start);
   if (bit_info_end == std::string::npos) {
     return false;
@@ -148,6 +187,36 @@ bool ParseSignalLine(const std::string& line, Signal* signal) {
   return true;
 }
 
+// Helper function to find a message by ID in the DbcFile
+Message* FindMessageById(DbcFile* dbc_file, int message_id) {
+  for (auto& message : dbc_file->GetMutableMessages()) {
+    if (message.id == message_id) {
+      return &message;
+    }
+  }
+  return nullptr;
+}
+
+// Helper function to find a signal by name in a message
+Signal* FindSignalByName(Message* message, const std::string& signal_name) {
+  for (auto& signal : message->signals) {
+    if (signal.name == signal_name) {
+      return &signal;
+    }
+  }
+  return nullptr;
+}
+
+// Helper function to find a node by name
+Node* FindNodeByName(DbcFile* dbc_file, const std::string& node_name) {
+  for (auto& node : dbc_file->GetMutableNodes()) {
+    if (node.name == node_name) {
+      return &node;
+    }
+  }
+  return nullptr;
+}
+
 int DbcParser::Parse(const std::string& file_path, std::unique_ptr<DbcFile>* dbc_file) {
   std::ifstream file(file_path);
   if (!file.is_open()) {
@@ -211,6 +280,86 @@ int DbcParser::Parse(const std::string& file_path, std::unique_ptr<DbcFile>* dbc
       if (ParseSignalLine(line, &signal)) {
         current_message->signals.push_back(signal);
       }
+      continue;
+    }
+    
+    // Parse Comments (CM_)
+    if (line.find("CM_") == 0) {
+      // Comments can be for messages, signals, or nodes
+      std::regex message_comment_regex(R"(CM_\s+BO_\s+(\d+)\s+\"([^\"]+)\")");
+      std::regex signal_comment_regex(R"(CM_\s+SG_\s+(\d+)\s+(\w+)\s+\"([^\"]+)\")");
+      std::regex node_comment_regex(R"(CM_\s+BU_\s+(\w+)\s+\"([^\"]+)\")");
+      
+      std::smatch match;
+      
+      // Check for message comment
+      if (std::regex_search(line, match, message_comment_regex) && match.size() > 2) {
+        int message_id = std::stoi(match[1].str());
+        std::string comment = match[2].str();
+        
+        Message* message = FindMessageById(dbc_file->get(), message_id);
+        if (message) {
+          message->comment = comment;
+        }
+      } 
+      // Check for signal comment
+      else if (std::regex_search(line, match, signal_comment_regex) && match.size() > 3) {
+        int message_id = std::stoi(match[1].str());
+        std::string signal_name = match[2].str();
+        std::string comment = match[3].str();
+        
+        Message* message = FindMessageById(dbc_file->get(), message_id);
+        if (message) {
+          Signal* signal = FindSignalByName(message, signal_name);
+          if (signal) {
+            signal->comment = comment;
+          }
+        }
+      }
+      // Check for node comment
+      else if (std::regex_search(line, match, node_comment_regex) && match.size() > 2) {
+        std::string node_name = match[1].str();
+        std::string comment = match[2].str();
+        
+        Node* node = FindNodeByName(dbc_file->get(), node_name);
+        if (node) {
+          node->comment = comment;
+        }
+      }
+      continue;
+    }
+    
+    // Parse Value Descriptions (VAL_)
+    if (line.find("VAL_") == 0) {
+      std::regex val_start_regex(R"(VAL_\s+(\d+)\s+(\w+))");
+      std::smatch match;
+      
+      if (std::regex_search(line, match, val_start_regex) && match.size() > 2) {
+        int message_id = std::stoi(match[1].str());
+        std::string signal_name = match[2].str();
+        
+        Message* message = FindMessageById(dbc_file->get(), message_id);
+        if (message) {
+          Signal* signal = FindSignalByName(message, signal_name);
+          if (signal) {
+            // Parse the individual value-description pairs
+            size_t pos = line.find(signal_name) + signal_name.length();
+            std::string values_part = line.substr(pos);
+            
+            std::regex value_desc_regex(R"((\d+)\s+\"([^\"]+)\")");
+            auto value_begin = std::sregex_iterator(values_part.begin(), values_part.end(), value_desc_regex);
+            auto value_end = std::sregex_iterator();
+            
+            for (std::sregex_iterator i = value_begin; i != value_end; ++i) {
+              std::smatch value_match = *i;
+              int value = std::stoi(value_match[1].str());
+              std::string description = value_match[2].str();
+              signal->value_descriptions[value] = description;
+            }
+          }
+        }
+      }
+      continue;
     }
   }
   

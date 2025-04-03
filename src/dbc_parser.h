@@ -35,6 +35,10 @@ struct Signal {
   std::vector<std::string> receiver_nodes;
   std::string comment;
   std::unordered_map<int, std::string> value_descriptions;
+  
+  // Multiplexing support
+  bool is_multiplexer = false;       // True if this signal is a multiplexer
+  int multiplexer_value = -1;        // Multiplexer value for multiplexed signals, -1 for main multiplexer
 };
 
 // Structure for a Message
@@ -59,11 +63,13 @@ class DbcFile {
 
   // Nodes (ECUs)
   const std::vector<Node>& GetNodes() const;
+  std::vector<Node>& GetMutableNodes();
   void AddNode(const Node& node);
   void AddNode(const std::string& name);
   
   // Messages
   const std::vector<Message>& GetMessages() const;
+  std::vector<Message>& GetMutableMessages();
   void AddMessage(const Message& message);
   Message& GetLastMessage();
   

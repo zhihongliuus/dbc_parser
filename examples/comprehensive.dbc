@@ -1,0 +1,84 @@
+VERSION "2.0"
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BU_: ECU1 ECU2 ECU3 ECU4
+
+// Standard message with signals
+BO_ 100 EngineData: 8 ECU1
+ SG_ EngineSpeed : 0|16@1- (0.1,0) [0|8000] "rpm" ECU2, ECU3
+ SG_ EngineTemp : 16|8@1+ (1,-40) [-40|215] "C" ECU2
+ SG_ EngineTorque : 24|16@0- (0.5,0) [-500|500] "Nm" ECU2, ECU3, ECU4
+ SG_ EngineState : 48|2@1+ (1,0) [0|3] "" ECU2, ECU3
+
+// Multiplexed message
+BO_ 200 MuxMessage: 8 ECU2
+ SG_ MuxSelector M : 0|3@1+ (1,0) [0|7] "" ECU1, ECU3
+ SG_ Speed m0 : 8|16@1+ (0.01,0) [0|300] "kph" ECU1, ECU3
+ SG_ Acceleration m0 : 24|16@1- (0.001,0) [-10|10] "g" ECU1
+ SG_ FuelLevel m1 : 8|8@1+ (1,0) [0|100] "%" ECU1, ECU3
+ SG_ FuelPressure m1 : 16|16@1+ (0.1,0) [0|6500] "kPa" ECU1
+ SG_ BatteryVoltage m2 : 8|16@1+ (0.01,0) [0|30] "V" ECU1, ECU3
+ SG_ BatteryCurrent m2 : 24|16@1- (0.01,0) [-100|100] "A" ECU1
+ SG_ OilPressure m3 : 8|16@1+ (0.01,0) [0|1000] "kPa" ECU1, ECU3
+ SG_ OilTemp m3 : 24|8@1+ (1,-40) [-40|215] "C" ECU1
+
+// Message with different byte orders and signs
+BO_ 300 MixedData: 8 ECU3
+ SG_ SignalA : 0|16@1+ (1,0) [0|65535] "" ECU1, ECU2
+ SG_ SignalB : 16|16@0+ (1,0) [0|65535] "" ECU1, ECU2
+ SG_ SignalC : 32|16@1- (1,0) [-32768|32767] "" ECU1, ECU2
+ SG_ SignalD : 48|16@0- (1,0) [-32768|32767] "" ECU1, ECU2
+
+// Comments
+CM_ BU_ ECU1 "Engine Control Unit";
+CM_ BU_ ECU2 "Transmission Control Unit";
+CM_ BU_ ECU3 "Body Control Module";
+CM_ BU_ ECU4 "Infotainment System";
+
+CM_ BO_ 100 "Engine related data";
+CM_ SG_ 100 EngineSpeed "Engine speed in revolutions per minute";
+CM_ SG_ 100 EngineTemp "Engine temperature in Celsius";
+CM_ SG_ 100 EngineTorque "Engine torque in Newton meters";
+CM_ SG_ 100 EngineState "Current engine state";
+
+CM_ BO_ 200 "Multiplexed message with various data based on selector";
+CM_ SG_ 200 MuxSelector "Multiplexer selector for different data sets";
+CM_ SG_ 200 Speed "Vehicle speed";
+CM_ SG_ 200 FuelLevel "Fuel level percentage";
+CM_ SG_ 200 BatteryVoltage "Battery voltage";
+CM_ SG_ 200 OilPressure "Engine oil pressure";
+
+CM_ BO_ 300 "Mixed data with different byte orders and signs";
+
+// Value descriptions
+VAL_ 100 EngineState 0 "Off" 1 "Idle" 2 "Running" 3 "Error";
+VAL_ 200 MuxSelector 0 "Speed & Acceleration" 1 "Fuel" 2 "Battery" 3 "Oil" 4 "Reserved" 5 "Reserved" 6 "Reserved" 7 "Reserved"; 
