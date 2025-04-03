@@ -1,114 +1,103 @@
 # DBC Parser
 
-A high-performance C++ library for parsing, manipulating, and decoding CAN DBC files.
+A robust, C++ library for parsing DBC files used in automotive CAN networks.
+
+## Overview
+
+This library provides a complete parser for DBC (Database CAN) files, which are widely used to describe CAN networks in automotive applications. The parser supports all elements of the DBC file format including messages, signals, value tables, and more.
 
 ## Features
 
-- Fast parsing and decoding of DBC files using Boost Spirit
-- Support for KCD file format
-- Editing DBC/KCD through C++ interface
-- Decoding functionality for CAN frames of arbitrary byte length
-- cantools-like decoding interface
-- Detailed error reporting for parser issues
-- Comprehensive coverage of DBC data types:
-  - Version
-  - New symbols
-  - Bit timing
-  - Nodes
-  - Value tables
-  - Messages and signals
-  - Signal multiplexing
-  - Message transmitters
-  - Environment variables
-  - Signal types
-  - Comments
-  - Attribute definitions and values
-  - Value descriptions
-  - Signal extended value types
-  - Signal groups
+- Complete DBC file format support
+- Modern C++ implementation (C++17)
+- Built with PEGTL (Parsing Expression Grammar Template Library)
+- Robust error handling
+- Well-tested using TDD methodology
+- Easy-to-use API
 
-## Dependencies
+## Supported DBC Elements
 
-- C++17 compatible compiler
-- Boost (Spirit, Fusion, Phoenix, Program Options, Filesystem)
-- Bazel build system
+- Version Information
+- New Symbols
+- Bit Timing
+- Nodes (ECUs)
+- Value Tables
+- Messages and Signals
+- Signal Multiplexing
+- Message Transmitters
+- Environment Variables
+- Signal Types
+- Comments
+- Attribute Definitions and Values
+- Value Descriptions
+- Signal Extended Value Types
+- Signal Groups
 
 ## Building
 
-The project uses Bazel with bzlmod for dependency management.
+This project uses Bazel as its build system.
+
+### Prerequisites
+
+- Bazel build system
+- C++17 compatible compiler
+
+### Build Steps
 
 ```bash
-# Build the library and CLI tool
-bazel build //...
+# Clone the repository
+git clone https://github.com/yourusername/dbc_parser.git
+cd dbc_parser
 
-# Build with optimizations
-bazel build -c opt //...
+# Build the library
+bazel build //:dbc_parser
 
-# Run tests
-bazel test //...
+# Build the examples
+bazel build //examples:simple_parser
+
+# Run the tests
+bazel test //test/unit:dbc_parser_test
+bazel test //test/integration:dbc_parser_integration_test
 ```
 
-## Usage Examples
-
-### Command-line Interface
-
-The project includes a command-line tool for basic DBC file operations:
-
-```bash
-# Show help
-bazel run //:dbc_parser_cli -- --help
-
-# List all messages in a DBC file
-bazel run //:dbc_parser_cli -- -i my_file.dbc --list-messages
-
-# Show details for a specific message
-bazel run //:dbc_parser_cli -- -i my_file.dbc --message 0x123
-bazel run //:dbc_parser_cli -- -i my_file.dbc --message EngineStatus
-
-# Decode a CAN frame
-bazel run //:dbc_parser_cli -- -i my_file.dbc --decode 0x123 1122334455667788
-```
-
-### C++ API
+## Usage Example
 
 ```cpp
-#include "dbc_parser/parser.h"
-#include "dbc_parser/decoder.h"
+#include <iostream>
+#include <memory>
+#include "src/dbc_parser.h"
 
-// Parse a DBC file
-dbc_parser::ParserOptions options;
-options.verbose = true;
-auto parser = dbc_parser::ParserFactory::create_parser("my_file.dbc");
-auto db = parser->parse_file("my_file.dbc", options);
-
-// Access message and signal information
-for (const auto& msg_pair : db->messages()) {
-  const dbc_parser::Message& msg = *msg_pair.second;
-  std::cout << "Message: " << msg.name() << " (ID: " << msg.id() << ")\n";
+int main() {
+  // Create a parser
+  dbc_parser::DbcParser parser;
   
-  for (const auto& sig_pair : msg.signals()) {
-    const dbc_parser::Signal& sig = *sig_pair.second;
-    std::cout << "  Signal: " << sig.name() << "\n";
+  // Parse a DBC file
+  std::unique_ptr<dbc_parser::DbcFile> dbc_file;
+  int result = parser.Parse("path/to/your/file.dbc", &dbc_file);
+  
+  if (result != 0) {
+    std::cerr << "Error parsing DBC file: " << parser.GetLastError() << std::endl;
+    return 1;
   }
-}
-
-// Decode a CAN frame
-std::vector<uint8_t> data = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
-dbc_parser::Decoder decoder(std::make_shared<dbc_parser::Database>(*db));
-auto decoded = decoder.decode_frame(0x123, data);
-
-if (decoded) {
-  for (const auto& sig_pair : decoded->signals) {
-    std::cout << sig_pair.first << " = " << sig_pair.second.value << " " 
-              << sig_pair.second.unit << "\n";
-  }
+  
+  // Access DBC elements
+  std::cout << "DBC Version: " << dbc_file->GetVersion() << std::endl;
+  
+  // More functionality will be added as the implementation progresses
+  
+  return 0;
 }
 ```
+
+## Development
+
+This project follows Test-Driven Development principles:
+
+1. Write a test that defines a function or improvements of a function
+2. Run the test, which should fail because the function is not implemented
+3. Write the simplest code that passes the test
+4. Refactor the code until it conforms to the standards while passing the test
 
 ## License
 
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. 
+This project is licensed under the MIT License - see the LICENSE file for details. 
