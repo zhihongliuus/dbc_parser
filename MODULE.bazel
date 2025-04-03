@@ -1,6 +1,0 @@
-module(
-    name = "dbc_parser",
-)
-
-bazel_dep(name = "rules_cc", version = "0.0.17")
-bazel_dep(name = "googletest", version = "1.14.0.bcr.1") 
