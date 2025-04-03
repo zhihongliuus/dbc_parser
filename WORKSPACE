@@ -12,4 +12,10 @@ git_repository(
     name = "com_google_googletest",
     remote = "https://github.com/google/googletest.git",
     tag = "release-1.12.1",  # Use appropriate version
+)
+
+git_repository(
+    name = "com_github_taocpp_pegtl",
+    remote = "https://github.com/taocpp/PEGTL.git",
+    tag = "3.2.7",
 ) 

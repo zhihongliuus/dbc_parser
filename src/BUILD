@@ -9,6 +9,7 @@ cc_library(
     deps = [
         "//src/dbc_types:dbc_types",
         "//src/grammar:grammar",
-        "@com_github_taocpp_pegtl//:pegtl",
+        # PEGTL dependency will be added back when we implement the grammar
+        # "@com_github_taocpp_pegtl//:pegtl",
     ],
 ) 
