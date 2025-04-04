@@ -1,0 +1,16 @@
+package(default_visibility = ["//visibility:private"])
+
+cc_test(
+    name = "dbc_parser_test",
+    srcs = glob(["**/*_test.cc"]),
+    deps = [
+        "//src/dbc_parser:dbc_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+    copts = [
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+) 
