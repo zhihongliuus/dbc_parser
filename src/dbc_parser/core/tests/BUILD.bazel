@@ -1,0 +1,17 @@
+cc_test(
+    name = "simple_test",
+    srcs = ["simple_test.cc"],
+    deps = ["@com_google_googletest//:gtest_main"],
+    copts = ["-std=c++17"],
+)
+
+cc_test(
+    name = "string_utils_test2",
+    srcs = ["string_utils_test2.cc"],
+    deps = [
+        "@com_google_googletest//:gtest_main",
+        "//src/dbc_parser:dbc_parser",
+    ],
+    copts = ["-std=c++17"],
+    includes = ["."],
+)

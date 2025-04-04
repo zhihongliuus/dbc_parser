@@ -2,9 +2,10 @@ package(default_visibility = ["//visibility:private"])
 
 cc_test(
     name = "dbc_parser_test",
-    srcs = glob(["**/*_test.cc"]),
+    srcs = glob(["**/*_test.cc"], allow_empty = True),
     deps = [
         "//src/dbc_parser:dbc_parser",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
     copts = [
@@ -13,4 +14,5 @@ cc_test(
         "-Wextra",
         "-Werror",
     ],
+    includes = ["../../src"],
 ) 
