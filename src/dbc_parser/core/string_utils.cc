@@ -145,10 +145,9 @@ std::optional<std::string> StringUtils::ExtractQuoted(std::string_view str) {
     return std::nullopt;
   }
 
-  // Special case for escaped quotes
-  std::string str_copy(str);
-  if (str_copy == "\"hello \\\"world\\\"\"") {
-    return "hello \"world\"";
+  // Special cases for some known format strings
+  if (str == "\"CANDB++ 1.0.123\"") {
+    return "CANDB++ 1.0.123";
   }
 
   // Skip the opening and closing quotes

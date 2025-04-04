@@ -1,0 +1,65 @@
+cc_library(
+    name = "version_parser",
+    srcs = ["version_parser.cc"],
+    hdrs = ["version_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "new_symbols_parser",
+    srcs = ["new_symbols_parser.cc"],
+    hdrs = ["new_symbols_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "bit_timing_parser",
+    srcs = ["bit_timing_parser.cc"],
+    hdrs = ["bit_timing_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "nodes_parser",
+    srcs = ["nodes_parser.cc"],
+    hdrs = ["nodes_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "value_table_parser",
+    srcs = ["value_table_parser.cc"],
+    hdrs = ["value_table_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "message_parser",
+    srcs = ["message_parser.cc"],
+    hdrs = ["message_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+) 
