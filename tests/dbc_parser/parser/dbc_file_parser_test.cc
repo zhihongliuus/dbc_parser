@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <map>
 
 #include "gtest/gtest.h"
 
@@ -117,6 +118,28 @@ BS_: 500
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ("2.0", result->version);
   // We're not checking bit_timing as it's not fully implemented yet
+}
+
+// Test value table section
+TEST_F(DbcFileParserTest, ParsesValueTable) {
+  const std::string kInput = R"(
+VERSION "2.0"
+VAL_TABLE_ StateTable 0 "Off" 1 "On" 2 "Error";
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("2.0", result->version);
+  
+  // Verify value table content
+  ASSERT_EQ(1, result->value_tables.size()) << "Expected one value table";
+  ASSERT_TRUE(result->value_tables.count("StateTable") > 0) << "Expected to find StateTable";
+  
+  const auto& table = result->value_tables.at("StateTable");
+  ASSERT_EQ(3, table.size()) << "Expected 3 values in StateTable";
+  EXPECT_EQ("Off", table.at(0));
+  EXPECT_EQ("On", table.at(1));
+  EXPECT_EQ("Error", table.at(2));
 }
 
 // Test parsing multiple sections

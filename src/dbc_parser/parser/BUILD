@@ -205,6 +205,7 @@ cc_library(
         ":message_transmitters_parser",
         ":new_symbols_parser",
         ":nodes_parser",
+        ":value_table_parser",
         ":version_parser",
         "//third_party/pegtl:pegtl",
     ],

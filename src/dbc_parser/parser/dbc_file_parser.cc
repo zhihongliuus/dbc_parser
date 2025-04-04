@@ -5,6 +5,7 @@
 #include <string_view>
 #include <memory>
 #include <optional>
+#include <map>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/analyze.hpp>
@@ -15,6 +16,7 @@
 #include "src/dbc_parser/parser/message_parser.h"
 #include "src/dbc_parser/parser/message_transmitters_parser.h"
 #include "src/dbc_parser/parser/bit_timing_parser.h"
+#include "src/dbc_parser/parser/value_table_parser.h"
 
 // Only include parsers that are actually used in this file
 // Other parsers are included in the BUILD file for future implementation
@@ -595,6 +597,40 @@ struct action<grammar::bit_timing_section> {
     }
   }
 };
+
+// Actions for VAL_TABLE_ section
+template<>
+struct action<grammar::value_table_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_value_table_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::value_table_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.value_table_content.empty()) {
+      auto value_table_result = ValueTableParser::Parse(state.value_table_content);
+      if (value_table_result) {
+        // Convert from unordered_map to map
+        std::map<int, std::string> values_map;
+        for (const auto& [key, value] : value_table_result->values) {
+          values_map[key] = value;
+        }
+        
+        // Add the value table to the map
+        state.dbc_file.value_tables[value_table_result->name] = values_map;
+        state.found_valid_section = true;
+      }
+    }
+  }
+};
+
+// Actions for SG_ section - handled within the message context
+// When we parse messages, we'll need to add logic to handle signals
+// associated with those messages
 
 // Continuation line handling based on current section
 template<>
