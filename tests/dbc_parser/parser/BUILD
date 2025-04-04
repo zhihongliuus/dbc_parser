@@ -124,4 +124,14 @@ cc_test(
         "//src/dbc_parser/parser:comment_parser",
         "@com_google_googletest//:gtest_main",
     ],
+)
+
+# Test for the value description parser
+cc_test(
+    name = "value_description_parser_test",
+    srcs = ["value_description_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:value_description_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
 ) 

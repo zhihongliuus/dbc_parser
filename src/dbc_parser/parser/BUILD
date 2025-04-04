@@ -143,4 +143,14 @@ cc_library(
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "value_description_parser",
+    srcs = ["value_description_parser.cc"],
+    hdrs = ["value_description_parser.h"],
+    deps = [
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
 ) 
