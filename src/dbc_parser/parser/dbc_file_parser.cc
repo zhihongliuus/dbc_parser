@@ -25,6 +25,7 @@
 #include "src/dbc_parser/parser/environment_variable_data_parser.h"
 #include "src/dbc_parser/parser/comment_parser.h"
 #include "src/dbc_parser/parser/signal_value_type_parser.h"
+#include "src/dbc_parser/parser/signal_group_parser.h"
 
 
 // Only include parsers that are actually used in this file
@@ -772,6 +773,40 @@ struct action<grammar::sig_val_type_section> {
         
         // Add the signal value type to the list
         state.dbc_file.signal_value_types.push_back(sig_val_type);
+        state.found_valid_section = true;
+      }
+    }
+  }
+};
+
+// Actions for SIG_GROUP_ section
+template<>
+struct action<grammar::sig_group_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_sig_group_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::sig_group_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.sig_group_content.empty()) {
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.sig_group_content);
+      
+      auto sig_group_result = SignalGroupParser::Parse(content);
+      if (sig_group_result) {
+        // Create a new signal group definition
+        DbcFile::SignalGroupDef sig_group;
+        sig_group.message_id = sig_group_result->message_id;
+        sig_group.name = sig_group_result->group_name;
+        sig_group.repetitions = sig_group_result->repetitions;
+        sig_group.signal_names = sig_group_result->signals;
+        
+        // Add the signal group to the list
+        state.dbc_file.signal_groups.push_back(sig_group);
         state.found_valid_section = true;
       }
     }

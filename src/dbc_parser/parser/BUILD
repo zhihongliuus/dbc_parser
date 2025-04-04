@@ -229,6 +229,7 @@ cc_library(
         ":value_table_parser",
         ":version_parser",
         ":signal_value_type_parser",
+        ":signal_group_parser",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

@@ -464,6 +464,54 @@ SIG_VALTYPE_ 456 BrakeForce 0;
   EXPECT_TRUE(found_brake_force) << "Failed to find BrakeForce signal value type";
 }
 
+// Test parsing signal groups
+TEST_F(DbcFileParserTest, ParsesSignalGroups) {
+  const std::string kInput = R"(
+VERSION "1.0"
+SIG_GROUP_ 123 EngineGroup 1 : Rpm,Temperature,Throttle;
+SIG_GROUP_ 456 BrakeGroup 2 : BrakeForce,BrakePosition;
+)";
+  
+  auto result = parser_->Parse(kInput);
+  
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->version, "1.0");
+  ASSERT_EQ(result->signal_groups.size(), 2);
+  
+  // Check the first signal group
+  bool found_engine_group = false;
+  for (const auto& group : result->signal_groups) {
+    if (group.message_id == 123 && 
+        group.name == "EngineGroup" &&
+        group.repetitions == 1 &&
+        group.signal_names.size() == 3) {
+      // Check signal names
+      EXPECT_EQ(group.signal_names[0], "Rpm");
+      EXPECT_EQ(group.signal_names[1], "Temperature");
+      EXPECT_EQ(group.signal_names[2], "Throttle");
+      found_engine_group = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_engine_group) << "Failed to find EngineGroup signal group";
+  
+  // Check the second signal group
+  bool found_brake_group = false;
+  for (const auto& group : result->signal_groups) {
+    if (group.message_id == 456 && 
+        group.name == "BrakeGroup" &&
+        group.repetitions == 2 &&
+        group.signal_names.size() == 2) {
+      // Check signal names
+      EXPECT_EQ(group.signal_names[0], "BrakeForce");
+      EXPECT_EQ(group.signal_names[1], "BrakePosition");
+      found_brake_group = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_brake_group) << "Failed to find BrakeGroup signal group";
+}
+
 }  // namespace
 }  // namespace parser
 }  // namespace dbc_parser 
