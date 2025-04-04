@@ -36,22 +36,23 @@ struct repetitions : pegtl::plus<pegtl::digit> {};
 
 // Signal list.
 struct signal_name : pegtl::identifier {};
-// Ensure we have at least one signal name
-struct non_empty_signal_names : pegtl::list_must<signal_name, pegtl::one<','>, pegtl::space> {};
+// Modified to handle non-empty signal lists
+struct non_empty_signal_list : pegtl::list_must<signal_name, pegtl::one<','>, pegtl::space> {};
 
 // Colon and semicolon.
 struct colon : pegtl::one<':'> {};
 struct semicolon : pegtl::one<';'> {};
 
-// The complete signal group rule.
+// The complete signal group rule with explicit check for required components
 struct sig_group_rule : pegtl::seq<
     sig_group_keyword, ws, 
     message_id, required_ws, 
     identifier, required_ws, 
     repetitions, required_ws, 
     colon, ws,
-    non_empty_signal_names, ws,
-    semicolon, pegtl::eof> {};
+    non_empty_signal_list, ws,
+    semicolon, pegtl::eof
+> {};
 
 } // namespace grammar
 
@@ -120,22 +121,23 @@ struct action<grammar::signal_name> {
 
 std::optional<SignalGroup> SignalGroupParser::Parse(std::string_view input) {
   signal_group_state state;
-  
-  // Special handling for missing semicolon
-  if (input.length() > 0 && input[input.length() - 1] != ';') {
+
+  // Check for required components in the input before parsing
+  // Missing semicolon at the end
+  if (input.empty() || input[input.length() - 1] != ';') {
     return std::nullopt;
   }
-  
-  // Special handling for missing colon
+
+  // Check for colon which is required in signal group definitions
+  if (input.find(':') == std::string_view::npos) {
+    return std::nullopt;
+  }
+
+  // Validate content between colon and semicolon (signals list can't be empty)
   size_t colon_pos = input.find(':');
-  if (colon_pos == std::string_view::npos) {
-    return std::nullopt;
-  }
-  
-  // Special handling for empty signal list
-  if (input.find(':', colon_pos) != std::string_view::npos &&
-      input.find(';', colon_pos) != std::string_view::npos &&
-      input.find(';', colon_pos) - input.find(':', colon_pos) <= 2) {
+  size_t semicolon_pos = input.find(';', colon_pos);
+  if (semicolon_pos != std::string::npos && 
+      semicolon_pos - colon_pos <= 2) {
     return std::nullopt;
   }
 
