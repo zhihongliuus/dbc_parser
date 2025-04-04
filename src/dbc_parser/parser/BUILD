@@ -123,4 +123,24 @@ cc_library(
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "signal_parser",
+    srcs = ["signal_parser.cc"],
+    hdrs = ["signal_parser.h"],
+    deps = [
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "comment_parser",
+    srcs = ["comment_parser.cc"],
+    hdrs = ["comment_parser.h"],
+    deps = [
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
 ) 

@@ -104,4 +104,24 @@ cc_test(
         "//src/dbc_parser/parser:signal_group_parser",
         "@com_google_googletest//:gtest_main",
     ],
+)
+
+# Test for the signal parser
+cc_test(
+    name = "signal_parser_test",
+    srcs = ["signal_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:signal_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+# Test for the comment parser
+cc_test(
+    name = "comment_parser_test",
+    srcs = ["comment_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:comment_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
 ) 
