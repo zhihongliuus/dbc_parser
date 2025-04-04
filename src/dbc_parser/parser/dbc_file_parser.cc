@@ -6,6 +6,8 @@
 #include <memory>
 #include <optional>
 #include <map>
+#include <utility>
+#include <variant>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/analyze.hpp>
@@ -19,6 +21,7 @@
 #include "src/dbc_parser/parser/value_table_parser.h"
 #include "src/dbc_parser/parser/environment_variable_parser.h"
 #include "src/dbc_parser/parser/environment_variable_data_parser.h"
+#include "src/dbc_parser/parser/comment_parser.h"
 
 // Instead of including signal_parser.h directly which causes a conflict,
 // forward declare the SignalParser class
@@ -174,11 +177,11 @@ struct dbc_file : pegtl::until<pegtl::eof,
                       nodes_section,
                       value_table_section,
                       message_section,
-                      signal_key,
                       message_transmitters_section,
                       env_var_section,
                       env_var_data_section,
                       comment_section,
+                      signal_key,
                       attr_def_section,
                       attr_def_def_section,
                       attr_section,
@@ -664,14 +667,222 @@ struct action<grammar::signal_key> {
   }
 };
 
-// Actions for EV_ section
+// Actions for CM_ section
+template<>
+struct action<grammar::comment_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_comment_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::comment_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.comment_content.empty()) {
+      std::cout << "Original comment content: '" << state.comment_content << "'" << std::endl;
+      
+      // Trim any trailing newlines
+      std::string content = state.comment_content;
+      while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
+        content.pop_back();
+      }
+      
+      std::cout << "Cleaned comment content: '" << content << "'" << std::endl;
+      
+      // Use the existing CommentParser
+      auto comment_result = CommentParser::Parse(content);
+      
+      if (comment_result) {
+        // Create a new comment definition
+        DbcFile::CommentDef comment_def;
+        
+        // Set the comment text
+        comment_def.text = comment_result->text;
+        
+        // Set the comment type and associated object based on the comment type
+        if (comment_result->type == CommentType::NETWORK) {
+          comment_def.type = DbcFile::CommentDef::Type::Network;
+        } else if (comment_result->type == CommentType::NODE) {
+          comment_def.type = DbcFile::CommentDef::Type::Node;
+          if (std::holds_alternative<std::string>(comment_result->identifier)) {
+            comment_def.object_name = std::get<std::string>(comment_result->identifier);
+          }
+        } else if (comment_result->type == CommentType::MESSAGE) {
+          comment_def.type = DbcFile::CommentDef::Type::Message;
+          if (std::holds_alternative<int>(comment_result->identifier)) {
+            comment_def.object_id = std::get<int>(comment_result->identifier);
+          }
+        } else if (comment_result->type == CommentType::SIGNAL) {
+          comment_def.type = DbcFile::CommentDef::Type::Signal;
+          if (std::holds_alternative<std::pair<int, std::string>>(comment_result->identifier)) {
+            const auto& id_pair = std::get<std::pair<int, std::string>>(comment_result->identifier);
+            comment_def.object_id = id_pair.first;
+            comment_def.signal_index = 0;  // We don't have signal indices yet, set to 0
+            comment_def.object_name = id_pair.second;  // Store signal name in object_name
+          }
+        } else if (comment_result->type == CommentType::ENV_VAR) {
+          comment_def.type = DbcFile::CommentDef::Type::EnvVar;
+          if (std::holds_alternative<std::string>(comment_result->identifier)) {
+            comment_def.object_name = std::get<std::string>(comment_result->identifier);
+          }
+        }
+        
+        // Add the comment to the list
+        state.dbc_file.comments.push_back(comment_def);
+        state.found_valid_section = true;
+        
+        std::cout << "Successfully parsed comment of type: " 
+                  << static_cast<int>(comment_def.type) << " with text: '" << comment_def.text << "'" << std::endl;
+      } else {
+        std::cout << "Failed to parse comment" << std::endl;
+      }
+    } else {
+      std::cout << "Empty comment content" << std::endl;
+    }
+  }
+};
+
+// Continuation line handling based on current section
+template<>
+struct action<grammar::indented_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    std::string content = in.string();
+    
+    // Handle continuation lines based on current section
+    switch (state.current_section) {
+      case dbc_state::SectionType::NewSymbols:
+        state.add_to_new_symbols(content);
+        break;
+      case dbc_state::SectionType::BitTiming:
+        state.add_to_bit_timing(content);
+        break;
+      case dbc_state::SectionType::Nodes:
+        state.add_to_nodes(content);
+        break;
+      case dbc_state::SectionType::Message:
+        state.add_to_message(content);
+        break;
+      case dbc_state::SectionType::MessageTransmitters:
+        state.add_to_message_transmitters(content);
+        break;
+      case dbc_state::SectionType::ValueTable:
+        state.add_to_value_table(content);
+        break;
+      case dbc_state::SectionType::EnvVar:
+        state.add_to_env_var(content);
+        break;
+      case dbc_state::SectionType::EnvVarData:
+        state.add_to_env_var_data(content);
+        break;
+      case dbc_state::SectionType::Comment:
+        state.add_to_comment(content);
+        break;
+      case dbc_state::SectionType::AttrDef:
+        state.add_to_attr_def(content);
+        break;
+      case dbc_state::SectionType::AttrDefDef:
+        state.add_to_attr_def_def(content);
+        break;
+      case dbc_state::SectionType::Attr:
+        state.add_to_attr(content);
+        break;
+      case dbc_state::SectionType::ValueDesc:
+        state.add_to_value_desc(content);
+        break;
+      case dbc_state::SectionType::SigValType:
+        state.add_to_sig_val_type(content);
+        break;
+      case dbc_state::SectionType::SigGroup:
+        state.add_to_sig_group(content);
+        break;
+      case dbc_state::SectionType::SigMulVal:
+        state.add_to_sig_mul_val(content);
+        break;
+      default:
+        // VERSION doesn't support continuation lines
+        break;
+    }
+  }
+};
+
+// Actions for env_var sections
 template<>
 struct action<grammar::env_var_line> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
     state.set_env_var_content(in.string());
+    std::cout << "Setting environment variable content: '" << in.string() << "'" << std::endl;
   }
 };
+
+// Actions for env_var_data sections
+template<>
+struct action<grammar::env_var_data_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_env_var_data_content(in.string());
+    std::cout << "Setting environment variable data content: '" << in.string() << "'" << std::endl;
+  }
+};
+
+// Main parser implementation
+std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
+  // Empty input check
+  if (input.empty()) {
+    return std::nullopt;
+  }
+  
+  // Analyze grammar for potential issues
+  if (const std::size_t issues = pegtl::analyze<grammar::dbc_file>()) {
+    // We can still try to parse even if analysis shows issues
+    std::cerr << "Grammar analysis found " << issues << " issues" << std::endl;
+  }
+
+  try {
+    // Initialize parsing state
+    dbc_state state;
+    
+    // Parse input using PEGTL
+    pegtl::memory_input in(input.data(), input.size(), "DBC file");
+    if (pegtl::parse<grammar::dbc_file, action>(in, state)) {
+      // Handle invalid version format test
+      if (state.invalid_version_format) {
+        return std::nullopt;
+      }
+      
+      // Direct processing of message transmitters since PEGTL grammar may not match them
+      std::string input_str(input);
+      std::istringstream iss(input_str);
+      std::string line;
+      
+      while (std::getline(iss, line)) {
+        if (line.find("BO_TX_BU_") != std::string::npos) {
+          // Process this line directly
+          auto transmitters_result = MessageTransmittersParser::Parse(line);
+          if (transmitters_result) {
+            state.dbc_file.message_transmitters[transmitters_result->message_id] = 
+                transmitters_result->transmitters;
+            state.found_valid_section = true;
+          }
+        }
+      }
+      
+      // Return result if we found at least one valid section
+      if (state.found_valid_section) {
+        return state.dbc_file;
+      }
+    }
+  } catch (const pegtl::parse_error& e) {
+    // Handle parsing errors with detailed information
+    std::cerr << "Parse error: " << e.what() << std::endl;
+    return std::nullopt;
+  }
+
+  return std::nullopt;
+}
 
 template<>
 struct action<grammar::env_var_section> {
@@ -680,13 +891,15 @@ struct action<grammar::env_var_section> {
     if (!state.env_var_content.empty()) {
       std::cout << "Original environment variable content: '" << state.env_var_content << "'" << std::endl;
       
-      // Parse environment variable directly without using EnvironmentVariableParser
+      // Trim any trailing newlines
       std::string content = state.env_var_content;
-      // Remove trailing newlines
       while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
         content.pop_back();
       }
       
+      std::cout << "Cleaned environment variable content: '" << content << "'" << std::endl;
+      
+      // Parse environment variable directly with our custom implementation
       // Expected format: EV_ EngineTemp 1 [0|120] "C" 20 0 DUMMY_NODE_VECTOR0 Vector__XXX;
       // Split by spaces but handle quoted strings and bracket content
       std::vector<std::string> tokens;
@@ -797,15 +1010,6 @@ struct action<grammar::env_var_section> {
   }
 };
 
-// Actions for ENVVAR_DATA_ section
-template<>
-struct action<grammar::env_var_data_line> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, dbc_state& state) {
-    state.set_env_var_data_content(in.string());
-  }
-};
-
 template<>
 struct action<grammar::env_var_data_section> {
   template<typename ActionInput>
@@ -813,13 +1017,15 @@ struct action<grammar::env_var_data_section> {
     if (!state.env_var_data_content.empty()) {
       std::cout << "Original environment variable data content: '" << state.env_var_data_content << "'" << std::endl;
       
-      // Parse environment variable data directly without using EnvironmentVariableDataParser
+      // Trim any trailing newlines
       std::string content = state.env_var_data_content;
-      // Remove trailing newlines
       while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
         content.pop_back();
       }
       
+      std::cout << "Cleaned environment variable data content: '" << content << "'" << std::endl;
+      
+      // Parse environment variable data directly 
       // Expected format: ENVVAR_DATA_ EngineTemp: 5;
       // Split by spaces but handle colons and semicolons
       std::vector<std::string> tokens;
@@ -895,126 +1101,6 @@ struct action<grammar::env_var_data_section> {
     }
   }
 };
-
-// Continuation line handling based on current section
-template<>
-struct action<grammar::indented_line> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, dbc_state& state) {
-    std::string content = in.string();
-    
-    // Handle continuation lines based on current section
-    switch (state.current_section) {
-      case dbc_state::SectionType::NewSymbols:
-        state.add_to_new_symbols(content);
-        break;
-      case dbc_state::SectionType::BitTiming:
-        state.add_to_bit_timing(content);
-        break;
-      case dbc_state::SectionType::Nodes:
-        state.add_to_nodes(content);
-        break;
-      case dbc_state::SectionType::Message:
-        state.add_to_message(content);
-        break;
-      case dbc_state::SectionType::MessageTransmitters:
-        state.add_to_message_transmitters(content);
-        break;
-      case dbc_state::SectionType::ValueTable:
-        state.add_to_value_table(content);
-        break;
-      case dbc_state::SectionType::EnvVar:
-        state.add_to_env_var(content);
-        break;
-      case dbc_state::SectionType::EnvVarData:
-        state.add_to_env_var_data(content);
-        break;
-      case dbc_state::SectionType::Comment:
-        state.add_to_comment(content);
-        break;
-      case dbc_state::SectionType::AttrDef:
-        state.add_to_attr_def(content);
-        break;
-      case dbc_state::SectionType::AttrDefDef:
-        state.add_to_attr_def_def(content);
-        break;
-      case dbc_state::SectionType::Attr:
-        state.add_to_attr(content);
-        break;
-      case dbc_state::SectionType::ValueDesc:
-        state.add_to_value_desc(content);
-        break;
-      case dbc_state::SectionType::SigValType:
-        state.add_to_sig_val_type(content);
-        break;
-      case dbc_state::SectionType::SigGroup:
-        state.add_to_sig_group(content);
-        break;
-      case dbc_state::SectionType::SigMulVal:
-        state.add_to_sig_mul_val(content);
-        break;
-      default:
-        // VERSION doesn't support continuation lines
-        break;
-    }
-  }
-};
-
-// Main parser implementation
-std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
-  // Empty input check
-  if (input.empty()) {
-    return std::nullopt;
-  }
-  
-  // Analyze grammar for potential issues
-  if (const std::size_t issues = pegtl::analyze<grammar::dbc_file>()) {
-    // We can still try to parse even if analysis shows issues
-    std::cerr << "Grammar analysis found " << issues << " issues" << std::endl;
-  }
-
-  try {
-    // Initialize parsing state
-    dbc_state state;
-    
-    // Parse input using PEGTL
-    pegtl::memory_input in(input.data(), input.size(), "DBC file");
-    if (pegtl::parse<grammar::dbc_file, action>(in, state)) {
-      // Handle invalid version format test
-      if (state.invalid_version_format) {
-        return std::nullopt;
-      }
-      
-      // Direct processing of message transmitters since PEGTL grammar may not match them
-      std::string input_str(input);
-      std::istringstream iss(input_str);
-      std::string line;
-      
-      while (std::getline(iss, line)) {
-        if (line.find("BO_TX_BU_") != std::string::npos) {
-          // Process this line directly
-          auto transmitters_result = MessageTransmittersParser::Parse(line);
-          if (transmitters_result) {
-            state.dbc_file.message_transmitters[transmitters_result->message_id] = 
-                transmitters_result->transmitters;
-            state.found_valid_section = true;
-          }
-        }
-      }
-      
-      // Return result if we found at least one valid section
-      if (state.found_valid_section) {
-        return state.dbc_file;
-      }
-    }
-  } catch (const pegtl::parse_error& e) {
-    // Handle parsing errors with detailed information
-    std::cerr << "Parse error: " << e.what() << std::endl;
-    return std::nullopt;
-  }
-
-  return std::nullopt;
-}
 
 }  // namespace parser
 }  // namespace dbc_parser 

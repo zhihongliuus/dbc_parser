@@ -358,6 +358,60 @@ ENVVAR_DATA_ EngineTemp: 5;
   EXPECT_EQ("EngineTemp", env_var_data.data_name);
 }
 
+// Test parsing comments
+TEST_F(DbcFileParserTest, ParsesComments) {
+  const std::string kInput = R"(
+VERSION "1.0"
+
+CM_ "Network comment";
+CM_ BU_ Node1 "Node comment";
+CM_ BO_ 123 "Message comment";
+CM_ SG_ 123 Signal1 "Signal comment";
+CM_ EV_ EnvVar1 "Environment variable comment";
+)";
+  
+  auto result = parser_->Parse(kInput);
+  
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->version, "1.0");
+  EXPECT_EQ(result->comments.size(), 5);
+  
+  // Check the network comment
+  bool found_network_comment = false;
+  for (const auto& comment : result->comments) {
+    if (comment.type == DbcFile::CommentDef::Type::Network && 
+        comment.text == "Network comment") {
+      found_network_comment = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_network_comment);
+  
+  // Check the node comment
+  bool found_node_comment = false;
+  for (const auto& comment : result->comments) {
+    if (comment.type == DbcFile::CommentDef::Type::Node && 
+        comment.object_name == "Node1" &&
+        comment.text == "Node comment") {
+      found_node_comment = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_node_comment);
+  
+  // Check the message comment
+  bool found_message_comment = false;
+  for (const auto& comment : result->comments) {
+    if (comment.type == DbcFile::CommentDef::Type::Message && 
+        comment.object_id == 123 &&
+        comment.text == "Message comment") {
+      found_message_comment = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_message_comment);
+}
+
 }  // namespace
 }  // namespace parser
 }  // namespace dbc_parser 

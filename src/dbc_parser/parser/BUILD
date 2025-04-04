@@ -201,6 +201,7 @@ cc_library(
     hdrs = ["dbc_file_parser.h"],
     deps = [
         ":bit_timing_parser",
+        ":comment_parser",
         ":environment_variable_parser",
         ":environment_variable_data_parser",
         ":message_parser",
