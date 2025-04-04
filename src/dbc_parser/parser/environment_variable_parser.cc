@@ -53,8 +53,10 @@ struct range : pegtl::seq<
                  open_bracket,
                  ws,
                  decimal,
-                 ws,
-                 decimal,
+                 pegtl::sor<
+                   pegtl::seq<ws, decimal>,  // [min max] format
+                   pegtl::seq<pegtl::one<'|'>, decimal>  // [min|max] format
+                 >,
                  ws,
                  close_bracket
                > {};
