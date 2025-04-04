@@ -24,4 +24,20 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 """,
+)
+
+# Alias for existing code that uses taocpp_pegtl
+http_archive(
+    name = "taocpp_pegtl",
+    urls = ["https://github.com/taocpp/PEGTL/archive/3.2.7.zip"],
+    strip_prefix = "PEGTL-3.2.7",
+    sha256 = "f2ef563c0b0c3488b3aadb5404a8ce7a78985b4b0a9e0a96702305478c6e5af7",
+    build_file_content = """
+cc_library(
+    name = "pegtl",
+    hdrs = glob(["include/tao/pegtl/**/*.hpp"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+""",
 ) 

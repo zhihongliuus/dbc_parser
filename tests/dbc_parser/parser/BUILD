@@ -163,11 +163,22 @@ cc_test(
     ],
 )
 
+# Test for the DBC file parser
+cc_test(
+    name = "dbc_file_parser_test",
+    srcs = ["dbc_file_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:dbc_file_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 test_suite(
     name = "all",
     tests = [
         ":bit_timing_parser_test",
         ":comment_parser_test",
+        ":dbc_file_parser_test",
         ":environment_variable_data_parser_test",
         ":environment_variable_parser_test",
         ":message_parser_test",

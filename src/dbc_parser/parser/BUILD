@@ -160,7 +160,7 @@ cc_library(
     srcs = ["attribute_definition_parser.cc"],
     hdrs = ["attribute_definition_parser.h"],
     deps = [
-        "@taocpp_pegtl//:pegtl",
+        "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
 )
@@ -171,7 +171,7 @@ cc_library(
     hdrs = ["attribute_definition_default_parser.h"],
     deps = [
         ":attribute_definition_parser",
-        "@taocpp_pegtl//:pegtl",
+        "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
 )
@@ -182,7 +182,36 @@ cc_library(
     hdrs = ["attribute_value_parser.h"],
     deps = [
         ":attribute_definition_parser",
-        "@taocpp_pegtl//:pegtl",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# DBC File Parser - main parser that integrates all others
+cc_library(
+    name = "dbc_file_parser",
+    srcs = ["dbc_file_parser.cc"],
+    hdrs = ["dbc_file_parser.h"],
+    deps = [
+        ":version_parser",
+        ":new_symbols_parser",
+        ":bit_timing_parser",
+        ":nodes_parser",
+        ":value_table_parser",
+        ":message_parser",
+        ":message_transmitters_parser",
+        ":environment_variable_parser",
+        ":environment_variable_data_parser",
+        ":signal_type_def_parser",
+        ":signal_value_type_parser",
+        ":signal_group_parser",
+        ":signal_parser",
+        ":comment_parser",
+        ":value_description_parser",
+        ":attribute_definition_parser",
+        ":attribute_definition_default_parser",
+        ":attribute_value_parser",
+        "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
 ) 
