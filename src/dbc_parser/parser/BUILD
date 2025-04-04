@@ -83,4 +83,24 @@ cc_library(
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "environment_variable_data_parser",
+    srcs = ["environment_variable_data_parser.cc"],
+    hdrs = ["environment_variable_data_parser.h"],
+    deps = [
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "signal_type_def_parser",
+    srcs = ["signal_type_def_parser.cc"],
+    hdrs = ["signal_type_def_parser.h"],
+    deps = [
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
 ) 

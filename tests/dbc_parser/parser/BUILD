@@ -68,4 +68,22 @@ cc_test(
         "//src/dbc_parser/parser:environment_variable_parser",
         "@com_google_googletest//:gtest_main"
     ],
+)
+
+cc_test(
+    name = "environment_variable_data_parser_test",
+    srcs = ["environment_variable_data_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:environment_variable_data_parser",
+        "@com_google_googletest//:gtest_main"
+    ],
+)
+
+cc_test(
+    name = "signal_type_def_parser_test",
+    srcs = ["signal_type_def_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:signal_type_def_parser",
+        "@com_google_googletest//:gtest_main"
+    ],
 ) 
