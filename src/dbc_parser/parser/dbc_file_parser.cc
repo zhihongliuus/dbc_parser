@@ -54,35 +54,39 @@ struct message_transmitters_key : pegtl::string<'B', 'O', '_', 'T', 'X', '_', 'B
 struct line_content : pegtl::until<pegtl::eol> {};
 struct indented_line : pegtl::seq<ws, pegtl::plus<space>, pegtl::not_at<pegtl::eol>, pegtl::until<pegtl::eol>> {};
 
-// VERSION section
-struct version_section : pegtl::seq<
-                           pegtl::at<version_key>, 
-                           pegtl::until<pegtl::eol>> {};
+// Version-specific rules
+struct quoted_string : pegtl::seq<pegtl::one<'"'>, pegtl::until<pegtl::one<'"'>>, pegtl::opt<ws>> {};
+struct version_content : pegtl::seq<version_key, ws, quoted_string, pegtl::until<pegtl::eol>> {};
+struct invalid_version_content : pegtl::seq<version_key, ws, pegtl::not_at<pegtl::one<'"'>>, line_content> {};
 
-// NS_ section (with possible continuation lines)
+// Section rules with content capturing
+struct version_section : pegtl::sor<version_content, invalid_version_content> {};
+struct new_symbols_line : pegtl::seq<new_symbols_key, line_content> {};
+struct nodes_line : pegtl::seq<nodes_key, line_content> {};
+struct message_line : pegtl::seq<message_key, line_content> {};
+struct message_transmitters_line : pegtl::seq<message_transmitters_key, line_content> {};
+
+// Complete section definitions
 struct new_symbols_section : pegtl::seq<
-                               pegtl::at<new_symbols_key>, 
-                               pegtl::until<pegtl::eol>> {};
+                               new_symbols_line,
+                               pegtl::star<indented_line>> {};
 
-// BU_ section
 struct nodes_section : pegtl::seq<
-                         pegtl::at<nodes_key>, 
-                         pegtl::until<pegtl::eol>> {};
+                         nodes_line,
+                         pegtl::star<indented_line>> {};
 
-// BO_ section
 struct message_section : pegtl::seq<
-                           pegtl::at<message_key>,
-                           pegtl::until<pegtl::eol>> {};
+                           message_line,
+                           pegtl::star<indented_line>> {};
 
-// BO_TX_BU_ section
 struct message_transmitters_section : pegtl::seq<
-                                        pegtl::at<message_transmitters_key>,
-                                        pegtl::until<pegtl::eol>> {};
+                                        message_transmitters_line,
+                                        pegtl::star<indented_line>> {};
 
-// Any line with content
+// Any line with content (for skipping unknown lines)
 struct any_line : pegtl::seq<pegtl::not_at<eol>, pegtl::until<eol>> {};
 
-// Main grammar
+// Main grammar rule
 struct dbc_file : pegtl::until<pegtl::eof, 
                     pegtl::sor<
                       version_section,
@@ -90,7 +94,6 @@ struct dbc_file : pegtl::until<pegtl::eof,
                       nodes_section,
                       message_section,
                       message_transmitters_section,
-                      indented_line,
                       ignored,
                       any_line>> {};
 
@@ -99,75 +102,66 @@ struct dbc_file : pegtl::until<pegtl::eof,
 // State for parsing
 struct dbc_state {
   DbcFile dbc_file;
-  std::string current_section_type;
-  std::string accumulator;
-  bool in_section = false;
   bool found_valid_section = false;
   
-  // Start a new section
-  void start_section(const std::string& section_type, const std::string& content) {
-    // Process any existing section
-    process_current_section();
-    
-    // Start the new section
-    current_section_type = section_type;
-    accumulator = content;
-    in_section = true;
+  // Track version validity for invalid version format test
+  bool invalid_version_format = false;
+  
+  // Buffers for accumulating section content
+  std::string version_content;
+  std::string new_symbols_content;
+  std::string nodes_content;
+  std::string message_content;
+  std::string message_transmitters_content;
+  
+  // Methods to set section content
+  void set_version_content(const std::string& line) {
+    version_content = line;
   }
   
-  // Add a line to the current section
-  void add_to_section(const std::string& line) {
-    if (in_section) {
-      accumulator += "\n" + line;
-    }
+  void set_new_symbols_content(const std::string& line) {
+    new_symbols_content = line;
   }
   
-  // Process the current section and update the DbcFile
-  void process_current_section() {
-    if (!in_section || accumulator.empty()) {
-      return;
+  void set_nodes_content(const std::string& line) {
+    nodes_content = line;
+  }
+  
+  void set_message_content(const std::string& line) {
+    message_content = line;
+  }
+  
+  void set_message_transmitters_content(const std::string& line) {
+    message_transmitters_content = line;
+  }
+  
+  // Methods to add continuations to specific sections
+  void add_to_new_symbols(const std::string& line) {
+    if (!new_symbols_content.empty()) {
+      new_symbols_content += "\n";
     }
-    
-    if (current_section_type == "VERSION") {
-      auto version_result = VersionParser::Parse(accumulator);
-      if (version_result) {
-        dbc_file.version = version_result->version;
-        found_valid_section = true;
-      }
-    } else if (current_section_type == "NS_") {
-      auto symbols_result = NewSymbolsParser::Parse(accumulator);
-      if (symbols_result) {
-        dbc_file.new_symbols = symbols_result->symbols;
-        found_valid_section = true;
-      }
-    } else if (current_section_type == "BU_") {
-      auto nodes_result = NodesParser::Parse(accumulator);
-      if (nodes_result) {
-        dbc_file.nodes.clear();
-        for (const auto& node : nodes_result->nodes) {
-          dbc_file.nodes.push_back(node.name);
-        }
-        found_valid_section = true;
-      }
-    } else if (current_section_type == "BO_") {
-      auto message_result = MessageParser::Parse(accumulator);
-      if (message_result) {
-        dbc_file.messages[message_result->id] = message_result->name;
-        found_valid_section = true;
-      }
-    } else if (current_section_type == "BO_TX_BU_") {
-      auto transmitters_result = MessageTransmittersParser::Parse(accumulator);
-      if (transmitters_result) {
-        dbc_file.message_transmitters[transmitters_result->message_id] = 
-            transmitters_result->transmitters;
-        found_valid_section = true;
-      }
+    new_symbols_content += line;
+  }
+  
+  void add_to_nodes(const std::string& line) {
+    if (!nodes_content.empty()) {
+      nodes_content += "\n";
     }
-    
-    // Reset for next section
-    in_section = false;
-    current_section_type.clear();
-    accumulator.clear();
+    nodes_content += line;
+  }
+  
+  void add_to_message(const std::string& line) {
+    if (!message_content.empty()) {
+      message_content += "\n";
+    }
+    message_content += line;
+  }
+  
+  void add_to_message_transmitters(const std::string& line) {
+    if (!message_transmitters_content.empty()) {
+      message_transmitters_content += "\n";
+    }
+    message_transmitters_content += line;
   }
 };
 
@@ -175,63 +169,148 @@ struct dbc_state {
 template <typename Rule>
 struct action : pegtl::nothing<Rule> {};
 
-// Action for VERSION section
-template <>
-struct action<grammar::version_section> {
-  template <typename ActionInput>
+// Version actions
+template<>
+struct action<grammar::version_content> {
+  template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
-    state.start_section("VERSION", in.string());
+    state.set_version_content(in.string());
+    
+    // Process immediately to capture the version
+    auto version_result = VersionParser::Parse(state.version_content);
+    if (version_result) {
+      state.dbc_file.version = version_result->version;
+      state.found_valid_section = true;
+    }
   }
 };
 
-// Action for NS_ section
-template <>
+template<>
+struct action<grammar::invalid_version_content> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.invalid_version_format = true;
+  }
+};
+
+// Actions for NS_ section
+template<>
+struct action<grammar::new_symbols_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_new_symbols_content(in.string());
+  }
+};
+
+template<>
 struct action<grammar::new_symbols_section> {
-  template <typename ActionInput>
-  static void apply(const ActionInput& in, dbc_state& state) {
-    state.start_section("NS_", in.string());
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.new_symbols_content.empty()) {
+      auto symbols_result = NewSymbolsParser::Parse(state.new_symbols_content);
+      if (symbols_result) {
+        state.dbc_file.new_symbols = symbols_result->symbols;
+        state.found_valid_section = true;
+      }
+    }
   }
 };
 
-// Action for BU_ section
-template <>
+// Actions for BU_ section
+template<>
+struct action<grammar::nodes_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_nodes_content(in.string());
+  }
+};
+
+template<>
 struct action<grammar::nodes_section> {
-  template <typename ActionInput>
-  static void apply(const ActionInput& in, dbc_state& state) {
-    state.start_section("BU_", in.string());
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.nodes_content.empty()) {
+      auto nodes_result = NodesParser::Parse(state.nodes_content);
+      if (nodes_result) {
+        state.dbc_file.nodes.clear();
+        for (const auto& node : nodes_result->nodes) {
+          state.dbc_file.nodes.push_back(node.name);
+        }
+        state.found_valid_section = true;
+      }
+    }
   }
 };
 
-// Action for BO_ section
-template <>
+// Actions for BO_ section
+template<>
+struct action<grammar::message_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_message_content(in.string());
+  }
+};
+
+template<>
 struct action<grammar::message_section> {
-  template <typename ActionInput>
-  static void apply(const ActionInput& in, dbc_state& state) {
-    state.start_section("BO_", in.string());
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.message_content.empty()) {
+      auto message_result = MessageParser::Parse(state.message_content);
+      if (message_result) {
+        state.dbc_file.messages[message_result->id] = message_result->name;
+        state.found_valid_section = true;
+      }
+    }
   }
 };
 
-// Action for BO_TX_BU_ section
-template <>
+// Actions for BO_TX_BU_ section
+template<>
+struct action<grammar::message_transmitters_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_message_transmitters_content(in.string());
+  }
+};
+
+template<>
 struct action<grammar::message_transmitters_section> {
-  template <typename ActionInput>
-  static void apply(const ActionInput& in, dbc_state& state) {
-    state.start_section("BO_TX_BU_", in.string());
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.message_transmitters_content.empty()) {
+      auto transmitters_result = MessageTransmittersParser::Parse(state.message_transmitters_content);
+      if (transmitters_result) {
+        state.dbc_file.message_transmitters[transmitters_result->message_id] = 
+            transmitters_result->transmitters;
+        state.found_valid_section = true;
+      }
+    }
   }
 };
 
-// Action for indented (continuation) lines
-template <>
+// Continuation line handling for each active section
+template<>
 struct action<grammar::indented_line> {
-  template <typename ActionInput>
+  template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
-    state.add_to_section(in.string());
+    // Add continuation to the most recently used section
+    if (!state.new_symbols_content.empty()) {
+      state.add_to_new_symbols(in.string());
+    } else if (!state.nodes_content.empty()) {
+      state.add_to_nodes(in.string());
+    } else if (!state.message_content.empty()) {
+      state.add_to_message(in.string());
+    } else if (!state.message_transmitters_content.empty()) {
+      state.add_to_message_transmitters(in.string());
+    }
+    // VERSION doesn't support continuation lines
   }
 };
 
 // Main parser implementation
 std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
-  // Check grammar for potential issues
+  // Analyze grammar for potential issues (optional)
   if (const std::size_t issues = pegtl::analyze<grammar::dbc_file>()) {
     // We can still try to parse even if analysis shows issues
   }
@@ -243,8 +322,10 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
     // Parse input using PEGTL
     pegtl::memory_input in(input.data(), input.size(), "DBC file");
     if (pegtl::parse<grammar::dbc_file, action>(in, state)) {
-      // Process any final section that might be pending
-      state.process_current_section();
+      // Handle invalid version format test
+      if (state.invalid_version_format) {
+        return std::nullopt;
+      }
       
       // Return result if we found at least one valid section
       if (state.found_valid_section) {
