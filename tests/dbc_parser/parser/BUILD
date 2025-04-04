@@ -86,4 +86,22 @@ cc_test(
         "//src/dbc_parser/parser:signal_type_def_parser",
         "@com_google_googletest//:gtest_main"
     ],
+)
+
+cc_test(
+    name = "signal_value_type_parser_test",
+    srcs = ["signal_value_type_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:signal_value_type_parser",
+        "@com_google_googletest//:gtest_main"
+    ],
+)
+
+cc_test(
+    name = "signal_group_parser_test",
+    srcs = ["signal_group_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:signal_group_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
 ) 
