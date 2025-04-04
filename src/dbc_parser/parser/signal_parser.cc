@@ -118,7 +118,7 @@ struct signal_state {
   std::optional<std::string> unit;
   std::vector<std::string> receivers;
   bool is_multiplexer = false;
-  std::optional<int> multiplexed_by;
+  std::optional<int> multiplex_value;
 
   bool is_complete() const {
     return name.has_value() && 
@@ -164,7 +164,7 @@ struct action<grammar::multiplexed_by> {
     std::string value = in.string();
     // Skip the 'm' prefix
     try {
-      state.multiplexed_by = std::stoi(value.substr(1));
+      state.multiplex_value = std::stoi(value.substr(1));
     } catch (const std::exception& e) {
       // Error in conversion, leave as nullopt
     }
@@ -315,8 +315,11 @@ std::optional<Signal> SignalParser::Parse(std::string_view input) {
   result.name = *state.name;
   result.start_bit = *state.start_bit;
   result.signal_size = *state.signal_size;
+  result.length = *state.signal_size;  // Set both length and signal_size
   result.is_little_endian = *state.is_little_endian;
+  result.byte_order = *state.is_little_endian ? 1 : 0;  // Set byte_order based on little endian flag
   result.is_signed = *state.is_signed;
+  result.sign = *state.is_signed ? SignType::kSigned : SignType::kUnsigned;  // Set the enum value
   result.factor = *state.factor;
   result.offset = *state.offset;
   result.minimum = *state.minimum;
@@ -324,7 +327,17 @@ std::optional<Signal> SignalParser::Parse(std::string_view input) {
   result.unit = *state.unit;
   result.receivers = std::move(state.receivers);
   result.is_multiplexer = state.is_multiplexer;
-  result.multiplexed_by = state.multiplexed_by;
+  
+  // Update the multiplex value fields
+  if (state.is_multiplexer) {
+    result.multiplex_type = MultiplexType::kMultiplexor;
+  } else if (state.multiplex_value.has_value()) {
+    result.multiplex_type = MultiplexType::kMultiplexed;
+    result.multiplex_value = state.multiplex_value;
+    result.multiplex_value_int = *state.multiplex_value;
+  } else {
+    result.multiplex_type = MultiplexType::kNone;
+  }
 
   return result;
 }

@@ -60,6 +60,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
+        ":signal_parser",
     ],
     visibility = ["//visibility:public"],
 )

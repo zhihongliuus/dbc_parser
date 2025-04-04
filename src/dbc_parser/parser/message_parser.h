@@ -6,46 +6,10 @@
 #include <string_view>
 #include <vector>
 
+#include "src/dbc_parser/parser/signal_parser.h"
+
 namespace dbc_parser {
 namespace parser {
-
-// Signal byte order
-enum class ByteOrder {
-  kMotorola = 0,  // Big endian
-  kIntel = 1      // Little endian
-};
-
-// Signal value sign type
-enum class SignType {
-  kUnsigned = 0,
-  kSigned = 1
-};
-
-// Signal multiplexing type
-enum class MultiplexType {
-  kNone = 0,       // Not multiplexed
-  kMultiplexor,    // This signal is the multiplexor
-  kMultiplexed     // This signal is multiplexed
-};
-
-// Represents a signal within a message
-struct Signal {
-  std::string name;
-  int start_bit = 0;
-  int length = 0;
-  int byte_order = 0;  // 0=Motorola (big-endian), 1=Intel (little-endian)
-  SignType sign = SignType::kUnsigned;
-  double factor = 1.0;
-  double offset = 0.0;
-  double minimum = 0.0;
-  double maximum = 0.0;
-  std::string unit;
-  std::vector<std::string> receivers;
-  
-  // Multiplexing
-  MultiplexType multiplex_type = MultiplexType::kNone;
-  int multiplex_value = -1;  // Only relevant if multiplex_type is kMultiplexed
-};
 
 // Represents a message in the DBC file
 struct Message {
