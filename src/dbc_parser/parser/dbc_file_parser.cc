@@ -8,22 +8,12 @@
 
 #include "src/dbc_parser/parser/version_parser.h"
 #include "src/dbc_parser/parser/new_symbols_parser.h"
-#include "src/dbc_parser/parser/bit_timing_parser.h"
 #include "src/dbc_parser/parser/nodes_parser.h"
-#include "src/dbc_parser/parser/value_table_parser.h"
 #include "src/dbc_parser/parser/message_parser.h"
 #include "src/dbc_parser/parser/message_transmitters_parser.h"
-#include "src/dbc_parser/parser/environment_variable_parser.h"
-#include "src/dbc_parser/parser/environment_variable_data_parser.h"
-// Don't include signal_parser.h directly to avoid redefinition issues
-#include "src/dbc_parser/parser/signal_type_def_parser.h"
-#include "src/dbc_parser/parser/signal_value_type_parser.h"
-#include "src/dbc_parser/parser/signal_group_parser.h"
-#include "src/dbc_parser/parser/comment_parser.h"
-#include "src/dbc_parser/parser/value_description_parser.h"
-#include "src/dbc_parser/parser/attribute_definition_parser.h"
-#include "src/dbc_parser/parser/attribute_definition_default_parser.h"
-#include "src/dbc_parser/parser/attribute_value_parser.h"
+
+// Only include parsers that are actually used in this file
+// Other parsers are included in the BUILD file for future implementation
 
 namespace dbc_parser {
 namespace parser {
@@ -44,9 +34,7 @@ struct ignored : pegtl::sor<comment, blank_line> {};
 // Keywords for section identification
 struct version_key : pegtl::string<'V', 'E', 'R', 'S', 'I', 'O', 'N'> {};
 struct new_symbols_key : pegtl::string<'N', 'S', '_'> {};
-struct bit_timing_key : pegtl::string<'B', 'S', '_'> {};
 struct nodes_key : pegtl::string<'B', 'U', '_'> {};
-struct value_table_key : pegtl::string<'V', 'A', 'L', '_', 'T', 'A', 'B', 'L', 'E', '_'> {};
 struct message_key : pegtl::string<'B', 'O', '_'> {};
 struct message_transmitters_key : pegtl::string<'B', 'O', '_', 'T', 'X', '_', 'B', 'U', '_'> {};
 
