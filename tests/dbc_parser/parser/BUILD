@@ -134,4 +134,55 @@ cc_test(
         "//src/dbc_parser/parser:value_description_parser",
         "@com_google_googletest//:gtest_main",
     ],
+)
+
+cc_test(
+    name = "attribute_definition_parser_test",
+    srcs = ["attribute_definition_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:attribute_definition_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "attribute_definition_default_parser_test",
+    srcs = ["attribute_definition_default_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:attribute_definition_default_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "attribute_value_parser_test",
+    srcs = ["attribute_value_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:attribute_value_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+test_suite(
+    name = "all",
+    tests = [
+        ":bit_timing_parser_test",
+        ":comment_parser_test",
+        ":environment_variable_data_parser_test",
+        ":environment_variable_parser_test",
+        ":message_parser_test",
+        ":message_transmitters_parser_test",
+        ":new_symbols_parser_test",
+        ":nodes_parser_test",
+        ":signal_group_parser_test",
+        ":signal_parser_test",
+        ":signal_type_def_parser_test",
+        ":signal_value_type_parser_test",
+        ":value_description_parser_test",
+        ":value_table_parser_test",
+        ":version_parser_test",
+        ":attribute_definition_parser_test",
+        ":attribute_definition_default_parser_test",
+        ":attribute_value_parser_test",
+    ],
 ) 

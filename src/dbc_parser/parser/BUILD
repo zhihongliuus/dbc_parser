@@ -153,4 +153,36 @@ cc_library(
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "attribute_definition_parser",
+    srcs = ["attribute_definition_parser.cc"],
+    hdrs = ["attribute_definition_parser.h"],
+    deps = [
+        "@taocpp_pegtl//:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "attribute_definition_default_parser",
+    srcs = ["attribute_definition_default_parser.cc"],
+    hdrs = ["attribute_definition_default_parser.h"],
+    deps = [
+        ":attribute_definition_parser",
+        "@taocpp_pegtl//:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "attribute_value_parser",
+    srcs = ["attribute_value_parser.cc"],
+    hdrs = ["attribute_value_parser.h"],
+    deps = [
+        ":attribute_definition_parser",
+        "@taocpp_pegtl//:pegtl",
+    ],
+    visibility = ["//visibility:public"],
 ) 
