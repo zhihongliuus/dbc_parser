@@ -24,6 +24,7 @@
 #include "src/dbc_parser/parser/environment_variable_parser.h"
 #include "src/dbc_parser/parser/environment_variable_data_parser.h"
 #include "src/dbc_parser/parser/comment_parser.h"
+#include "src/dbc_parser/parser/signal_value_type_parser.h"
 
 
 // Only include parsers that are actually used in this file
@@ -742,6 +743,36 @@ struct action<grammar::signal_key> {
         // 1. Include signal_parser.h properly
         // 2. Use SignalParser::Parse to parse individual signals
         // 3. Associate them with the current message
+      }
+    }
+  }
+};
+
+// Actions for SIG_VALTYPE_ section
+template<>
+struct action<grammar::sig_val_type_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_sig_val_type_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::sig_val_type_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.sig_val_type_content.empty()) {
+      auto sig_val_type_result = SignalValueTypeParser::Parse(state.sig_val_type_content);
+      if (sig_val_type_result) {
+        // Create a new signal value type definition
+        DbcFile::SignalValueType sig_val_type;
+        sig_val_type.message_id = sig_val_type_result->message_id;
+        sig_val_type.signal_name = sig_val_type_result->signal_name;
+        sig_val_type.value_type = sig_val_type_result->type;
+        
+        // Add the signal value type to the list
+        state.dbc_file.signal_value_types.push_back(sig_val_type);
+        state.found_valid_section = true;
       }
     }
   }

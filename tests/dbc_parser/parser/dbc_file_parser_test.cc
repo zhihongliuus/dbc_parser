@@ -412,6 +412,58 @@ CM_ EV_ EnvVar1 "Environment variable comment";
   EXPECT_TRUE(found_message_comment);
 }
 
+// Test parsing signal value types
+TEST_F(DbcFileParserTest, ParsesSignalValueTypes) {
+  const std::string kInput = R"(
+VERSION "1.0"
+SIG_VALTYPE_ 123 EngineSpeed 1;
+SIG_VALTYPE_ 123 EngineTemp 2;
+SIG_VALTYPE_ 456 BrakeForce 0;
+)";
+  
+  auto result = parser_->Parse(kInput);
+  
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->version, "1.0");
+  ASSERT_EQ(result->signal_value_types.size(), 3);
+  
+  // Check the first signal value type
+  bool found_engine_speed = false;
+  for (const auto& val_type : result->signal_value_types) {
+    if (val_type.message_id == 123 && 
+        val_type.signal_name == "EngineSpeed" &&
+        val_type.value_type == 1) {  // 1 = float
+      found_engine_speed = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_engine_speed) << "Failed to find EngineSpeed signal value type";
+  
+  // Check the second signal value type
+  bool found_engine_temp = false;
+  for (const auto& val_type : result->signal_value_types) {
+    if (val_type.message_id == 123 && 
+        val_type.signal_name == "EngineTemp" &&
+        val_type.value_type == 2) {  // 2 = double
+      found_engine_temp = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_engine_temp) << "Failed to find EngineTemp signal value type";
+  
+  // Check the third signal value type
+  bool found_brake_force = false;
+  for (const auto& val_type : result->signal_value_types) {
+    if (val_type.message_id == 456 && 
+        val_type.signal_name == "BrakeForce" &&
+        val_type.value_type == 0) {  // 0 = integer
+      found_brake_force = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_brake_force) << "Failed to find BrakeForce signal value type";
+}
+
 }  // namespace
 }  // namespace parser
 }  // namespace dbc_parser 
