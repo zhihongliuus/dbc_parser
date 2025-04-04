@@ -18,6 +18,14 @@
 #include "src/dbc_parser/parser/bit_timing_parser.h"
 #include "src/dbc_parser/parser/value_table_parser.h"
 
+// Instead of including signal_parser.h directly which causes a conflict,
+// forward declare the SignalParser class
+namespace dbc_parser {
+namespace parser {
+class SignalParser;
+}  // namespace parser
+}  // namespace dbc_parser
+
 // Only include parsers that are actually used in this file
 // Other parsers are included in the BUILD file for future implementation
 
@@ -212,6 +220,9 @@ struct dbc_state {
   };
   
   SectionType current_section = SectionType::None;
+  
+  // Track current message ID for signal association
+  int current_message_id = -1;
   
   // Buffers for accumulating section content
   std::string version_content;
@@ -539,6 +550,8 @@ struct action<grammar::message_section> {
       if (message_result) {
         // Store basic message info in the 'messages' map
         state.dbc_file.messages[message_result->id] = message_result->name;
+        // Update current message ID for signal association
+        state.current_message_id = message_result->id;
         state.found_valid_section = true;
       }
     }
@@ -628,28 +641,23 @@ struct action<grammar::value_table_section> {
   }
 };
 
-// Actions for SG_ section - handled within the message context
-// When we parse messages, we'll need to add logic to handle signals
-// associated with those messages
-struct signal_line : pegtl::seq<grammar::signal_key, grammar::line_content> {};
-
+// Actions for SG_ section - implemented to handle signals within messages
+// For now, we just detect SG_ lines for validation, but don't try to parse them
+// due to the Signal struct conflict
 template<>
-struct action<signal_line> {
+struct action<grammar::signal_key> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
-    // The signal belongs to the most recently processed message
+    // Only process signals if we have a current message ID
     if (state.current_message_id >= 0) {
-      // Extract and parse the signal
-      std::string signal_content = in.string();
+      // Just mark that we found a signal section
+      // This is a placeholder for future signal parsing implementation
+      state.found_valid_section = true;
       
-      // Parse the signal using the SignalParser
-      auto signal_result = SignalParser::Parse(signal_content);
-      if (signal_result) {
-        // This is where we would add the signal to the message's signals vector
-        // However, we need to handle the Signal struct conflict between message_parser and signal_parser
-        // For now, we'll just set a flag indicating we found a valid section
-        state.found_valid_section = true;
-      }
+      // TODO: Future implementation will:
+      // 1. Define a common Signal representation or create an adapter
+      // 2. Include signal_parser.h in a way that doesn't conflict
+      // 3. Parse signals and associate them with their messages
     }
   }
 };
