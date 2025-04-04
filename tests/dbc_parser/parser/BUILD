@@ -50,4 +50,22 @@ cc_test(
         "//src/dbc_parser/parser:message_parser",
         "@com_google_googletest//:gtest_main",
     ],
+)
+
+cc_test(
+    name = "message_transmitters_parser_test",
+    srcs = ["message_transmitters_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:message_transmitters_parser",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "environment_variable_parser_test",
+    srcs = ["environment_variable_parser_test.cc"],
+    deps = [
+        "//src/dbc_parser/parser:environment_variable_parser",
+        "@com_google_googletest//:gtest_main"
+    ],
 ) 

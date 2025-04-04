@@ -62,4 +62,25 @@ cc_library(
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "message_transmitters_parser",
+    srcs = ["message_transmitters_parser.cc"],
+    hdrs = ["message_transmitters_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "environment_variable_parser",
+    srcs = ["environment_variable_parser.cc"],
+    hdrs = ["environment_variable_parser.h"],
+    deps = [
+        "//src/dbc_parser/core:string_utils",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
 ) 
