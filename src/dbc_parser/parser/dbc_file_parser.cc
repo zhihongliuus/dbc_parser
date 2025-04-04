@@ -1,10 +1,13 @@
 #include "src/dbc_parser/parser/dbc_file_parser.h"
 
+#include <iostream>
 #include <string>
 #include <string_view>
+#include <memory>
+#include <optional>
 
-#include "tao/pegtl.hpp"
-#include "tao/pegtl/contrib/analyze.hpp"
+#include <tao/pegtl.hpp>
+#include <tao/pegtl/contrib/analyze.hpp>
 
 #include "src/dbc_parser/parser/version_parser.h"
 #include "src/dbc_parser/parser/new_symbols_parser.h"
@@ -37,10 +40,23 @@ struct new_symbols_key : pegtl::string<'N', 'S', '_'> {};
 struct nodes_key : pegtl::string<'B', 'U', '_'> {};
 struct message_key : pegtl::string<'B', 'O', '_'> {};
 struct message_transmitters_key : pegtl::string<'B', 'O', '_', 'T', 'X', '_', 'B', 'U', '_'> {};
+struct bit_timing_key : pegtl::string<'B', 'S', '_'> {};
+struct value_table_key : pegtl::string<'V', 'A', 'L', '_', 'T', 'A', 'B', 'L', 'E', '_'> {};
+struct signal_key : pegtl::string<'S', 'G', '_'> {};
+struct env_var_key : pegtl::string<'E', 'V', '_'> {};
+struct env_var_data_key : pegtl::string<'E', 'N', 'V', 'V', 'A', 'R', '_', 'D', 'A', 'T', 'A', '_'> {};
+struct comment_key : pegtl::string<'C', 'M', '_'> {};
+struct attr_def_key : pegtl::string<'B', 'A', '_', 'D', 'E', 'F', '_'> {};
+struct attr_def_def_key : pegtl::string<'B', 'A', '_', 'D', 'E', 'F', '_', 'D', 'E', 'F', '_'> {};
+struct attr_key : pegtl::string<'B', 'A', '_'> {};
+struct value_desc_key : pegtl::string<'V', 'A', 'L', '_'> {};
+struct sig_val_type_key : pegtl::string<'S', 'I', 'G', '_', 'V', 'A', 'L', 'T', 'Y', 'P', 'E', '_'> {};
+struct sig_group_key : pegtl::string<'S', 'I', 'G', '_', 'G', 'R', 'O', 'U', 'P', '_'> {};
+struct sig_mul_val_key : pegtl::string<'S', 'G', '_', 'M', 'U', 'L', '_', 'V', 'A', 'L', '_'> {};
 
 // Rules for capturing line content
 struct line_content : pegtl::until<pegtl::eol> {};
-struct indented_line : pegtl::seq<ws, pegtl::plus<space>, pegtl::not_at<pegtl::eol>, pegtl::until<pegtl::eol>> {};
+struct indented_line : pegtl::seq<pegtl::opt<ws>, pegtl::plus<space>, pegtl::not_at<pegtl::eol>, pegtl::until<pegtl::eol>> {};
 
 // Version-specific rules
 struct quoted_string : pegtl::seq<pegtl::one<'"'>, pegtl::until<pegtl::one<'"'>>, pegtl::opt<ws>> {};
@@ -53,6 +69,18 @@ struct new_symbols_line : pegtl::seq<new_symbols_key, line_content> {};
 struct nodes_line : pegtl::seq<nodes_key, line_content> {};
 struct message_line : pegtl::seq<message_key, line_content> {};
 struct message_transmitters_line : pegtl::seq<message_transmitters_key, line_content> {};
+struct bit_timing_line : pegtl::seq<bit_timing_key, line_content> {};
+struct value_table_line : pegtl::seq<value_table_key, line_content> {};
+struct env_var_line : pegtl::seq<env_var_key, line_content> {};
+struct env_var_data_line : pegtl::seq<env_var_data_key, line_content> {};
+struct comment_line : pegtl::seq<comment_key, line_content> {};
+struct attr_def_line : pegtl::seq<attr_def_key, line_content> {};
+struct attr_def_def_line : pegtl::seq<attr_def_def_key, line_content> {};
+struct attr_line : pegtl::seq<attr_key, line_content> {};
+struct value_desc_line : pegtl::seq<value_desc_key, line_content> {};
+struct sig_val_type_line : pegtl::seq<sig_val_type_key, line_content> {};
+struct sig_group_line : pegtl::seq<sig_group_key, line_content> {};
+struct sig_mul_val_line : pegtl::seq<sig_mul_val_key, line_content> {};
 
 // Complete section definitions
 struct new_symbols_section : pegtl::seq<
@@ -71,6 +99,54 @@ struct message_transmitters_section : pegtl::seq<
                                         message_transmitters_line,
                                         pegtl::star<indented_line>> {};
 
+struct bit_timing_section : pegtl::seq<
+                              bit_timing_line,
+                              pegtl::star<indented_line>> {};
+
+struct value_table_section : pegtl::seq<
+                               value_table_line,
+                               pegtl::star<indented_line>> {};
+
+struct env_var_section : pegtl::seq<
+                           env_var_line,
+                           pegtl::star<indented_line>> {};
+
+struct env_var_data_section : pegtl::seq<
+                                env_var_data_line,
+                                pegtl::star<indented_line>> {};
+
+struct comment_section : pegtl::seq<
+                           comment_line,
+                           pegtl::star<indented_line>> {};
+
+struct attr_def_section : pegtl::seq<
+                            attr_def_line,
+                            pegtl::star<indented_line>> {};
+
+struct attr_def_def_section : pegtl::seq<
+                                attr_def_def_line,
+                                pegtl::star<indented_line>> {};
+
+struct attr_section : pegtl::seq<
+                        attr_line,
+                        pegtl::star<indented_line>> {};
+
+struct value_desc_section : pegtl::seq<
+                              value_desc_line,
+                              pegtl::star<indented_line>> {};
+
+struct sig_val_type_section : pegtl::seq<
+                                sig_val_type_line,
+                                pegtl::star<indented_line>> {};
+
+struct sig_group_section : pegtl::seq<
+                             sig_group_line,
+                             pegtl::star<indented_line>> {};
+
+struct sig_mul_val_section : pegtl::seq<
+                               sig_mul_val_line,
+                               pegtl::star<indented_line>> {};
+
 // Any line with content (for skipping unknown lines)
 struct any_line : pegtl::seq<pegtl::not_at<eol>, pegtl::until<eol>> {};
 
@@ -79,9 +155,22 @@ struct dbc_file : pegtl::until<pegtl::eof,
                     pegtl::sor<
                       version_section,
                       new_symbols_section,
+                      bit_timing_section,
                       nodes_section,
+                      value_table_section,
                       message_section,
+                      signal_key,
                       message_transmitters_section,
+                      env_var_section,
+                      env_var_data_section,
+                      comment_section,
+                      attr_def_section,
+                      attr_def_def_section,
+                      attr_section,
+                      value_desc_section,
+                      sig_val_type_section,
+                      sig_group_section,
+                      sig_mul_val_section,
                       ignored,
                       any_line>> {};
 
@@ -95,32 +184,133 @@ struct dbc_state {
   // Track version validity for invalid version format test
   bool invalid_version_format = false;
   
+  // Track which section was last seen to properly handle indented lines
+  enum SectionType {
+    None,
+    Version,
+    NewSymbols,
+    BitTiming,
+    Nodes,
+    Message,
+    MessageTransmitters,
+    ValueTable,
+    EnvVar,
+    EnvVarData,
+    Comment,
+    AttrDef,
+    AttrDefDef,
+    Attr,
+    ValueDesc,
+    SigValType,
+    SigGroup,
+    SigMulVal
+  };
+  
+  SectionType current_section = SectionType::None;
+  
   // Buffers for accumulating section content
   std::string version_content;
   std::string new_symbols_content;
   std::string nodes_content;
   std::string message_content;
   std::string message_transmitters_content;
+  std::string bit_timing_content;
+  std::string value_table_content;
+  std::string env_var_content;
+  std::string env_var_data_content;
+  std::string comment_content;
+  std::string attr_def_content;
+  std::string attr_def_def_content;
+  std::string attr_content;
+  std::string value_desc_content;
+  std::string sig_val_type_content;
+  std::string sig_group_content;
+  std::string sig_mul_val_content;
   
   // Methods to set section content
   void set_version_content(const std::string& line) {
     version_content = line;
+    current_section = SectionType::Version;
   }
   
   void set_new_symbols_content(const std::string& line) {
     new_symbols_content = line;
+    current_section = SectionType::NewSymbols;
   }
   
   void set_nodes_content(const std::string& line) {
     nodes_content = line;
+    current_section = SectionType::Nodes;
   }
   
   void set_message_content(const std::string& line) {
     message_content = line;
+    current_section = SectionType::Message;
   }
   
   void set_message_transmitters_content(const std::string& line) {
     message_transmitters_content = line;
+    current_section = SectionType::MessageTransmitters;
+  }
+  
+  void set_bit_timing_content(const std::string& line) {
+    bit_timing_content = line;
+    current_section = SectionType::BitTiming;
+  }
+  
+  void set_value_table_content(const std::string& line) {
+    value_table_content = line;
+    current_section = SectionType::ValueTable;
+  }
+  
+  void set_env_var_content(const std::string& line) {
+    env_var_content = line;
+    current_section = SectionType::EnvVar;
+  }
+  
+  void set_env_var_data_content(const std::string& line) {
+    env_var_data_content = line;
+    current_section = SectionType::EnvVarData;
+  }
+  
+  void set_comment_content(const std::string& line) {
+    comment_content = line;
+    current_section = SectionType::Comment;
+  }
+  
+  void set_attr_def_content(const std::string& line) {
+    attr_def_content = line;
+    current_section = SectionType::AttrDef;
+  }
+  
+  void set_attr_def_def_content(const std::string& line) {
+    attr_def_def_content = line;
+    current_section = SectionType::AttrDefDef;
+  }
+  
+  void set_attr_content(const std::string& line) {
+    attr_content = line;
+    current_section = SectionType::Attr;
+  }
+  
+  void set_value_desc_content(const std::string& line) {
+    value_desc_content = line;
+    current_section = SectionType::ValueDesc;
+  }
+  
+  void set_sig_val_type_content(const std::string& line) {
+    sig_val_type_content = line;
+    current_section = SectionType::SigValType;
+  }
+  
+  void set_sig_group_content(const std::string& line) {
+    sig_group_content = line;
+    current_section = SectionType::SigGroup;
+  }
+  
+  void set_sig_mul_val_content(const std::string& line) {
+    sig_mul_val_content = line;
+    current_section = SectionType::SigMulVal;
   }
   
   // Methods to add continuations to specific sections
@@ -150,6 +340,90 @@ struct dbc_state {
       message_transmitters_content += "\n";
     }
     message_transmitters_content += line;
+  }
+  
+  void add_to_bit_timing(const std::string& line) {
+    if (!bit_timing_content.empty()) {
+      bit_timing_content += "\n";
+    }
+    bit_timing_content += line;
+  }
+  
+  void add_to_value_table(const std::string& line) {
+    if (!value_table_content.empty()) {
+      value_table_content += "\n";
+    }
+    value_table_content += line;
+  }
+  
+  void add_to_env_var(const std::string& line) {
+    if (!env_var_content.empty()) {
+      env_var_content += "\n";
+    }
+    env_var_content += line;
+  }
+  
+  void add_to_env_var_data(const std::string& line) {
+    if (!env_var_data_content.empty()) {
+      env_var_data_content += "\n";
+    }
+    env_var_data_content += line;
+  }
+  
+  void add_to_comment(const std::string& line) {
+    if (!comment_content.empty()) {
+      comment_content += "\n";
+    }
+    comment_content += line;
+  }
+  
+  void add_to_attr_def(const std::string& line) {
+    if (!attr_def_content.empty()) {
+      attr_def_content += "\n";
+    }
+    attr_def_content += line;
+  }
+  
+  void add_to_attr_def_def(const std::string& line) {
+    if (!attr_def_def_content.empty()) {
+      attr_def_def_content += "\n";
+    }
+    attr_def_def_content += line;
+  }
+  
+  void add_to_attr(const std::string& line) {
+    if (!attr_content.empty()) {
+      attr_content += "\n";
+    }
+    attr_content += line;
+  }
+  
+  void add_to_value_desc(const std::string& line) {
+    if (!value_desc_content.empty()) {
+      value_desc_content += "\n";
+    }
+    value_desc_content += line;
+  }
+  
+  void add_to_sig_val_type(const std::string& line) {
+    if (!sig_val_type_content.empty()) {
+      sig_val_type_content += "\n";
+    }
+    sig_val_type_content += line;
+  }
+  
+  void add_to_sig_group(const std::string& line) {
+    if (!sig_group_content.empty()) {
+      sig_group_content += "\n";
+    }
+    sig_group_content += line;
+  }
+  
+  void add_to_sig_mul_val(const std::string& line) {
+    if (!sig_mul_val_content.empty()) {
+      sig_mul_val_content += "\n";
+    }
+    sig_mul_val_content += line;
   }
 };
 
@@ -246,6 +520,7 @@ struct action<grammar::message_section> {
     if (!state.message_content.empty()) {
       auto message_result = MessageParser::Parse(state.message_content);
       if (message_result) {
+        // Store basic message info in the 'messages' map
         state.dbc_file.messages[message_result->id] = message_result->name;
         state.found_valid_section = true;
       }
@@ -277,30 +552,90 @@ struct action<grammar::message_transmitters_section> {
   }
 };
 
-// Continuation line handling for each active section
+// Actions for BS_ section
+template<>
+struct action<grammar::bit_timing_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_bit_timing_content(in.string());
+  }
+};
+
+// Continuation line handling based on current section
 template<>
 struct action<grammar::indented_line> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
-    // Add continuation to the most recently used section
-    if (!state.new_symbols_content.empty()) {
-      state.add_to_new_symbols(in.string());
-    } else if (!state.nodes_content.empty()) {
-      state.add_to_nodes(in.string());
-    } else if (!state.message_content.empty()) {
-      state.add_to_message(in.string());
-    } else if (!state.message_transmitters_content.empty()) {
-      state.add_to_message_transmitters(in.string());
+    std::string content = in.string();
+    
+    // Handle continuation lines based on current section
+    switch (state.current_section) {
+      case dbc_state::SectionType::NewSymbols:
+        state.add_to_new_symbols(content);
+        break;
+      case dbc_state::SectionType::BitTiming:
+        state.add_to_bit_timing(content);
+        break;
+      case dbc_state::SectionType::Nodes:
+        state.add_to_nodes(content);
+        break;
+      case dbc_state::SectionType::Message:
+        state.add_to_message(content);
+        break;
+      case dbc_state::SectionType::MessageTransmitters:
+        state.add_to_message_transmitters(content);
+        break;
+      case dbc_state::SectionType::ValueTable:
+        state.add_to_value_table(content);
+        break;
+      case dbc_state::SectionType::EnvVar:
+        state.add_to_env_var(content);
+        break;
+      case dbc_state::SectionType::EnvVarData:
+        state.add_to_env_var_data(content);
+        break;
+      case dbc_state::SectionType::Comment:
+        state.add_to_comment(content);
+        break;
+      case dbc_state::SectionType::AttrDef:
+        state.add_to_attr_def(content);
+        break;
+      case dbc_state::SectionType::AttrDefDef:
+        state.add_to_attr_def_def(content);
+        break;
+      case dbc_state::SectionType::Attr:
+        state.add_to_attr(content);
+        break;
+      case dbc_state::SectionType::ValueDesc:
+        state.add_to_value_desc(content);
+        break;
+      case dbc_state::SectionType::SigValType:
+        state.add_to_sig_val_type(content);
+        break;
+      case dbc_state::SectionType::SigGroup:
+        state.add_to_sig_group(content);
+        break;
+      case dbc_state::SectionType::SigMulVal:
+        state.add_to_sig_mul_val(content);
+        break;
+      default:
+        // VERSION doesn't support continuation lines
+        break;
     }
-    // VERSION doesn't support continuation lines
   }
 };
 
 // Main parser implementation
 std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
-  // Analyze grammar for potential issues (optional)
+  // Empty input check
+  if (input.empty()) {
+    return std::nullopt;
+  }
+  
+  // Analyze grammar for potential issues
   if (const std::size_t issues = pegtl::analyze<grammar::dbc_file>()) {
     // We can still try to parse even if analysis shows issues
+    std::cerr << "Grammar analysis found " << issues << " issues" << std::endl;
   }
 
   try {
@@ -321,7 +656,8 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
       }
     }
   } catch (const pegtl::parse_error& e) {
-    // Handle parsing errors
+    // Handle parsing errors with detailed information
+    std::cerr << "Parse error: " << e.what() << std::endl;
     return std::nullopt;
   }
 
