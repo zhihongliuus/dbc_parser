@@ -631,6 +631,28 @@ struct action<grammar::value_table_section> {
 // Actions for SG_ section - handled within the message context
 // When we parse messages, we'll need to add logic to handle signals
 // associated with those messages
+struct signal_line : pegtl::seq<grammar::signal_key, grammar::line_content> {};
+
+template<>
+struct action<signal_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    // The signal belongs to the most recently processed message
+    if (state.current_message_id >= 0) {
+      // Extract and parse the signal
+      std::string signal_content = in.string();
+      
+      // Parse the signal using the SignalParser
+      auto signal_result = SignalParser::Parse(signal_content);
+      if (signal_result) {
+        // This is where we would add the signal to the message's signals vector
+        // However, we need to handle the Signal struct conflict between message_parser and signal_parser
+        // For now, we'll just set a flag indicating we found a valid section
+        state.found_valid_section = true;
+      }
+    }
+  }
+};
 
 // Continuation line handling based on current section
 template<>
