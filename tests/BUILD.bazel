@@ -1,6 +1,2 @@
-cc_test(
-    name = "simple_test",
-    srcs = ["simple_test.cc"],
-    deps = ["@com_google_googletest//:gtest_main"],
-    copts = ["-std=c++17"],
-)
+# Root BUILD file for tests
+# No individual tests defined here - all tests are in subdirectories 

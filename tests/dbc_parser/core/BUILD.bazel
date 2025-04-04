@@ -1,21 +1,4 @@
 cc_test(
-    name = "hello_test",
-    srcs = ["hello_test.cc"],
-    deps = [
-        "//src/dbc_parser:dbc_parser",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
-    ],
-    copts = [
-        "-std=c++17",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-    ],
-    includes = ["../../../src"],
-)
-
-cc_test(
     name = "string_utils_test",
     srcs = ["string_utils_test.cc"],
     deps = [
