@@ -60,11 +60,10 @@ struct envvar_data_rule : pegtl::seq<
 // Data structure to collect parsing results
 struct environment_variable_data_state {
   std::string name;
-  int data_size = 0;
+  std::string data;
   
   // Flags to track parsing progress
   bool name_set = false;
-  bool data_size_set = false;
 };
 
 // PEGTL actions
@@ -83,18 +82,6 @@ struct environment_variable_data_action<grammar::identifier> {
   }
 };
 
-// Action for extracting data size
-template<>
-struct environment_variable_data_action<grammar::integer> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_data_state& state) {
-    if (!state.data_size_set) {
-      state.data_size = std::stoi(in.string());
-      state.data_size_set = true;
-    }
-  }
-};
-
 std::optional<EnvironmentVariableData> EnvironmentVariableDataParser::Parse(std::string_view input) {
   // Create input for PEGTL parser
   pegtl::memory_input<> in(input.data(), input.size(), "ENVVAR_DATA_");
@@ -109,14 +96,14 @@ std::optional<EnvironmentVariableData> EnvironmentVariableDataParser::Parse(std:
     }
     
     // Verify required fields are set
-    if (!state.name_set || !state.data_size_set) {
+    if (!state.name_set) {
       return std::nullopt;
     }
     
     // Create and return EnvironmentVariableData object if parsing succeeded
     EnvironmentVariableData env_var_data;
     env_var_data.name = state.name;
-    env_var_data.data_size = state.data_size;
+    env_var_data.data = input.data(); // Store the full input as data
     
     return env_var_data;
   } catch (const pegtl::parse_error&) {

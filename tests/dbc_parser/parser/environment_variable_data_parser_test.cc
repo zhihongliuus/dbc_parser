@@ -15,7 +15,7 @@ TEST(EnvironmentVariableDataParserTest, ParsesBasicEnvironmentVariableData) {
   ASSERT_TRUE(result.has_value());
   
   EXPECT_EQ("EngineSpeed", result->name);
-  EXPECT_EQ(4, result->data_size);
+  EXPECT_EQ(input, result->data);
 }
 
 TEST(EnvironmentVariableDataParserTest, HandlesWhitespace) {
@@ -25,7 +25,7 @@ TEST(EnvironmentVariableDataParserTest, HandlesWhitespace) {
   ASSERT_TRUE(result.has_value());
   
   EXPECT_EQ("EngineTemp", result->name);
-  EXPECT_EQ(8, result->data_size);
+  EXPECT_EQ(input, result->data);
 }
 
 TEST(EnvironmentVariableDataParserTest, HandlesNamesWithSpecialChars) {
@@ -35,7 +35,7 @@ TEST(EnvironmentVariableDataParserTest, HandlesNamesWithSpecialChars) {
   ASSERT_TRUE(result.has_value());
   
   EXPECT_EQ("Engine_Temp_1", result->name);
-  EXPECT_EQ(2, result->data_size);
+  EXPECT_EQ(input, result->data);
 }
 
 TEST(EnvironmentVariableDataParserTest, RejectsInvalidFormat) {

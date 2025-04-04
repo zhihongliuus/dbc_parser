@@ -5,17 +5,10 @@
 #include <string>
 #include <string_view>
 
+#include "src/dbc_parser/parser/common_types.h"
+
 namespace dbc_parser {
 namespace parser {
-
-// Represents the data definition for an environment variable in the DBC file
-struct EnvironmentVariableData {
-  // Environmental variable name
-  std::string name;
-  
-  // Data size in bytes
-  int data_size = 0;
-};
 
 // Parser for the Environment Variable Data (ENVVAR_DATA_) section of a DBC file
 class EnvironmentVariableDataParser {
@@ -28,4 +21,4 @@ class EnvironmentVariableDataParser {
 }  // namespace parser
 }  // namespace dbc_parser
 
-#endif  // SRC_DBC_PARSER_PARSER_ENVIRONMENT_VARIABLE_DATA_PARSER_H_ 
+#endif  // SRC_DBC_PARSER_PARSER_ENVIRONMENT_VARIABLE_DATA_PARSER_H_

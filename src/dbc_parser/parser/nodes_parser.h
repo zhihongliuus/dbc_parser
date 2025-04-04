@@ -6,25 +6,17 @@
 #include <string_view>
 #include <vector>
 
+#include "src/dbc_parser/parser/common_types.h"
+
 namespace dbc_parser {
 namespace parser {
 
-// Represents a single node (ECU) in the DBC file
-struct Node {
-  std::string name;
-};
-
-// Contains all the nodes defined in the BU_ section
-struct Nodes {
-  std::vector<Node> nodes;
-};
-
-// Parser for the Nodes section (BU_) of a DBC file
+// Parser for nodes list (BU_) in DBC files
 class NodesParser {
  public:
-  // Parses a nodes section from the given input
+  // Parses a nodes section from the given input and returns a vector of Node objects
   // Returns std::nullopt if parsing fails
-  static std::optional<Nodes> Parse(std::string_view input);
+  static std::optional<std::vector<Node>> Parse(std::string_view input);
 };
 
 }  // namespace parser

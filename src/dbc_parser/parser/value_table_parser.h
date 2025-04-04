@@ -1,24 +1,20 @@
 #ifndef SRC_DBC_PARSER_PARSER_VALUE_TABLE_PARSER_H_
 #define SRC_DBC_PARSER_PARSER_VALUE_TABLE_PARSER_H_
 
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
+
+#include "src/dbc_parser/parser/common_types.h"
 
 namespace dbc_parser {
 namespace parser {
 
-// Represents a value table in the DBC file
-struct ValueTable {
-  std::string name;
-  std::unordered_map<int, std::string> values;
-};
-
-// Parser for the Value Table (VAL_TABLE_) section of a DBC file
+// Parser for value table (VAL_TABLE_) in DBC files
 class ValueTableParser {
  public:
-  // Parses a value table section from the given input
+  // Parses a value table section from the given input and returns a ValueTable object
   // Returns std::nullopt if parsing fails
   static std::optional<ValueTable> Parse(std::string_view input);
 };

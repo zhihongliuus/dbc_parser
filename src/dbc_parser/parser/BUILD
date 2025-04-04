@@ -25,6 +25,7 @@ cc_library(
     srcs = ["bit_timing_parser.cc"],
     hdrs = ["bit_timing_parser.h"],
     deps = [
+        ":common_types",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
     ],
@@ -36,6 +37,7 @@ cc_library(
     srcs = ["nodes_parser.cc"],
     hdrs = ["nodes_parser.h"],
     deps = [
+        ":common_types",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
     ],
@@ -47,6 +49,7 @@ cc_library(
     srcs = ["value_table_parser.cc"],
     hdrs = ["value_table_parser.h"],
     deps = [
+        ":common_types",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
     ],
@@ -58,6 +61,7 @@ cc_library(
     srcs = ["message_parser.cc"],
     hdrs = ["message_parser.h"],
     deps = [
+        ":common_types",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
         ":signal_parser",
@@ -80,6 +84,7 @@ cc_library(
     srcs = ["environment_variable_parser.cc"],
     hdrs = ["environment_variable_parser.h"],
     deps = [
+        ":common_types",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
     ],
@@ -91,6 +96,7 @@ cc_library(
     srcs = ["environment_variable_data_parser.cc"],
     hdrs = ["environment_variable_data_parser.h"],
     deps = [
+        ":common_types",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -131,6 +137,7 @@ cc_library(
     srcs = ["signal_parser.cc"],
     hdrs = ["signal_parser.h"],
     deps = [
+        ":common_types",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -141,6 +148,7 @@ cc_library(
     srcs = ["comment_parser.cc"],
     hdrs = ["comment_parser.h"],
     deps = [
+        ":common_types",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -195,6 +203,13 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "common_types",
+    hdrs = ["common_types.h"],
+    deps = [],
+    visibility = ["//visibility:public"],
+)
+
 # DBC File Parser - main parser that integrates all others
 cc_library(
     name = "dbc_file_parser",
@@ -203,6 +218,7 @@ cc_library(
     deps = [
         ":bit_timing_parser",
         ":comment_parser",
+        ":common_types",
         ":environment_variable_parser",
         ":environment_variable_data_parser",
         ":message_parser",

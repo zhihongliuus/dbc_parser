@@ -8,10 +8,12 @@
 #include <map>
 #include <utility>
 #include <variant>
+#include <sstream>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/analyze.hpp>
 
+#include "src/dbc_parser/core/string_utils.h"
 #include "src/dbc_parser/parser/version_parser.h"
 #include "src/dbc_parser/parser/new_symbols_parser.h"
 #include "src/dbc_parser/parser/nodes_parser.h"
@@ -31,6 +33,61 @@ namespace dbc_parser {
 namespace parser {
 
 namespace pegtl = tao::pegtl;
+
+// Use string utilities from the core namespace
+using dbc_parser::core::StringUtils;
+
+// Helper for string operations
+class StringUtilities {
+public:
+  // Split a string by a delimiter character and return a vector of trimmed tokens
+  static std::vector<std::string> SplitTrimmed(const std::string& str, char delimiter) {
+    std::vector<std::string> tokens = StringUtils::Split(str, delimiter);
+    for (auto& token : tokens) {
+      token = StringUtils::Trim(token);
+    }
+    return tokens;
+  }
+  
+  // Split a string by multiple delimiters and return a vector of trimmed tokens
+  static std::vector<std::string> SplitTrimmedByAny(const std::string& str, const std::string& delimiters) {
+    std::vector<std::string> tokens = StringUtils::SplitByAny(str, delimiters);
+    for (auto& token : tokens) {
+      token = StringUtils::Trim(token);
+    }
+    return tokens;
+  }
+  
+  // Trim whitespace from start and end of string
+  static std::string Trim(const std::string& str) {
+    return StringUtils::Trim(str);
+  }
+  
+  // Extract string content between quotes
+  static std::optional<std::string> ExtractQuoted(const std::string& str) {
+    return StringUtils::ExtractQuoted(str);
+  }
+  
+  // Remove quotes from a string if present
+  static std::string StripQuotes(const std::string& str) {
+    return StringUtils::StripQuotes(str);
+  }
+  
+  // Parse a string as an integer
+  static std::optional<int64_t> ParseInt(const std::string& str) {
+    return StringUtils::ParseInt(str);
+  }
+  
+  // Parse a string as a double
+  static std::optional<double> ParseDouble(const std::string& str) {
+    return StringUtils::ParseDouble(str);
+  }
+  
+  // Join a vector of strings with a delimiter
+  static std::string Join(const std::vector<std::string>& parts, const std::string& delimiter) {
+    return StringUtils::Join(parts, delimiter);
+  }
+};
 
 // Grammar for DBC file
 namespace grammar {
@@ -72,14 +129,32 @@ struct quoted_string : pegtl::seq<pegtl::one<'"'>, pegtl::until<pegtl::one<'"'>>
 struct version_content : pegtl::seq<version_key, ws, quoted_string, pegtl::until<pegtl::eol>> {};
 struct invalid_version_content : pegtl::seq<version_key, ws, pegtl::not_at<pegtl::one<'"'>>, line_content> {};
 
+// Enhanced rules for parsing specific data
+struct message_id : pegtl::plus<pegtl::digit> {};
+struct node_list : pegtl::list<pegtl::identifier, pegtl::one<','>, pegtl::space> {};
+
 // Section rules with content capturing
 struct version_section : pegtl::sor<version_content, invalid_version_content> {};
 struct new_symbols_line : pegtl::seq<new_symbols_key, line_content> {};
 struct nodes_line : pegtl::seq<nodes_key, line_content> {};
 struct message_line : pegtl::seq<message_key, line_content> {};
 
+// Enhanced message transmitters rule with improved pattern matching
+struct message_transmitters_content : pegtl::seq<
+                                       message_transmitters_key,
+                                       ws,
+                                       message_id,  // Message ID
+                                       ws,
+                                       node_list,  // List of transmitting nodes
+                                       pegtl::opt<ws>,
+                                       pegtl::one<';'>,  // Required semicolon
+                                       pegtl::opt<ws>,
+                                       pegtl::eol
+                                     > {};
+
 // Special handling for message transmitters with semicolon
 struct message_transmitters_line : pegtl::seq<message_transmitters_key, pegtl::until<pegtl::eol>> {};
+struct message_transmitters_section : pegtl::sor<message_transmitters_content, message_transmitters_line> {};
 
 struct bit_timing_line : pegtl::seq<bit_timing_key, line_content> {};
 struct value_table_line : pegtl::seq<value_table_key, line_content> {};
@@ -106,9 +181,6 @@ struct nodes_section : pegtl::seq<
 struct message_section : pegtl::seq<
                            message_line,
                            pegtl::star<indented_line>> {};
-
-// Special handling for message transmitters section that may include a semicolon
-struct message_transmitters_section : message_transmitters_line {};
 
 struct bit_timing_section : pegtl::seq<
                               bit_timing_line,
@@ -521,7 +593,7 @@ struct action<grammar::nodes_section> {
       auto nodes_result = NodesParser::Parse(state.nodes_content);
       if (nodes_result) {
         state.dbc_file.nodes.clear();
-        for (const auto& node : nodes_result->nodes) {
+        for (const auto& node : *nodes_result) {
           state.dbc_file.nodes.push_back(node.name);
         }
         state.found_valid_section = true;
@@ -572,26 +644,17 @@ struct action<grammar::message_section> {
 
 // Actions for BO_TX_BU_ section
 template<>
-struct action<grammar::message_transmitters_line> {
+struct action<grammar::message_transmitters_content> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
-    state.set_message_transmitters_content(in.string());
-  }
-};
-
-// Complete parsing of the message transmitters section
-template<>
-struct action<grammar::message_transmitters_section> {
-  template<typename ActionInput>
-  static void apply(const ActionInput&, dbc_state& state) {
-    if (!state.message_transmitters_content.empty()) {
-      std::string full_content = "BO_TX_BU_ " + state.message_transmitters_content + ";";
-      auto transmitters_result = MessageTransmittersParser::Parse(full_content);
-      if (transmitters_result) {
-        state.dbc_file.message_transmitters[transmitters_result->message_id] = 
-            transmitters_result->transmitters;
-        state.found_valid_section = true;
-      }
+    std::string content = in.string();
+    
+    // Parse the message transmitters directly through the dedicated parser
+    auto transmitters_result = MessageTransmittersParser::Parse(content);
+    if (transmitters_result) {
+      state.dbc_file.message_transmitters[transmitters_result->message_id] = 
+          transmitters_result->transmitters;
+      state.found_valid_section = true;
     }
   }
 };
@@ -610,15 +673,22 @@ struct action<grammar::bit_timing_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.bit_timing_content.empty()) {
-      // Just mark that we found a valid section
-      // In a future implementation, we would parse the bit timing content
-      state.found_valid_section = true;
-      
-      // For a proper implementation, we would do something like:
-      // auto bit_timing_result = BitTimingParser::Parse(state.bit_timing_content);
-      // if (bit_timing_result) {
-      //   // Set the result in the DbcFile
-      // }
+      auto bit_timing_result = BitTimingParser::Parse(state.bit_timing_content);
+      if (bit_timing_result) {
+        // Set the bit timing data in the DbcFile
+        DbcFile::BitTiming bit_timing;
+        bit_timing.baudrate = bit_timing_result->baudrate;
+        // BitTimingParser uses a combined btr1_btr2 field
+        // We need to adapt it to the DbcFile::BitTiming struct which has separate fields
+        
+        // Note: This is an approximation as we don't have the exact algorithm to split the combined value
+        // A more precise implementation would use the correct splitting logic
+        bit_timing.btr1 = static_cast<int>(bit_timing_result->btr1_btr2) / 100;
+        bit_timing.btr2 = static_cast<int>(bit_timing_result->btr1_btr2) % 100;
+        
+        state.dbc_file.bit_timing = bit_timing;
+        state.found_valid_section = true;
+      }
     }
   }
 };
@@ -693,12 +763,8 @@ struct action<grammar::comment_section> {
     if (!state.comment_content.empty()) {
       std::cout << "Original comment content: '" << state.comment_content << "'" << std::endl;
       
-      // Trim any trailing newlines
-      std::string content = state.comment_content;
-      while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
-        content.pop_back();
-      }
-      
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.comment_content);
       std::cout << "Cleaned comment content: '" << content << "'" << std::endl;
       
       // Use the existing CommentParser
@@ -845,12 +911,8 @@ struct action<grammar::env_var_data_section> {
     if (!state.env_var_data_content.empty()) {
       std::cout << "Original environment variable data content: '" << state.env_var_data_content << "'" << std::endl;
       
-      // Trim any trailing newlines
-      std::string content = state.env_var_data_content;
-      while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
-        content.pop_back();
-      }
-      
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.env_var_data_content);
       std::cout << "Cleaned environment variable data content: '" << content << "'" << std::endl;
       
       // Use the existing EnvironmentVariableDataParser
@@ -938,12 +1000,8 @@ struct action<grammar::env_var_section> {
     if (!state.env_var_content.empty()) {
       std::cout << "Original environment variable content: '" << state.env_var_content << "'" << std::endl;
       
-      // Trim any trailing newlines
-      std::string content = state.env_var_content;
-      while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
-        content.pop_back();
-      }
-      
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.env_var_content);
       std::cout << "Cleaned environment variable content: '" << content << "'" << std::endl;
       
       // Use the existing EnvironmentVariableParser
@@ -961,19 +1019,8 @@ struct action<grammar::env_var_section> {
         env_var.ev_id = env_var_result->ev_id;
         env_var.access_type = env_var_result->access_type;
         
-        // Process access nodes: split by commas
-        std::vector<std::string> access_nodes;
-        std::string nodes_str = env_var_result->access_nodes;
-        std::istringstream iss(nodes_str);
-        std::string node;
-        
-        while (std::getline(iss, node, ',')) {
-          if (!node.empty()) {
-            access_nodes.push_back(node);
-          }
-        }
-        
-        env_var.access_nodes = access_nodes;
+        // Convert access_nodes string to vector using the utility class
+        env_var.access_nodes = StringUtilities::SplitTrimmed(env_var_result->access_nodes, ',');
         
         // Store in the environment_variables map with name as the key
         state.dbc_file.environment_variables[env_var.name] = env_var;

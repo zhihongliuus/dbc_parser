@@ -49,7 +49,7 @@ struct bu_rule : pegtl::seq<
 
 // Data structure to collect parsing results
 struct nodes_state {
-  Nodes nodes;
+  std::vector<Node> nodes;
 };
 
 // PEGTL actions
@@ -63,11 +63,11 @@ struct action<grammar::node_name> {
   static void apply(const ActionInput& in, nodes_state& state) {
     Node node;
     node.name = in.string();
-    state.nodes.nodes.push_back(node);
+    state.nodes.push_back(node);
   }
 };
 
-std::optional<Nodes> NodesParser::Parse(std::string_view input) {
+std::optional<std::vector<Node>> NodesParser::Parse(std::string_view input) {
   if (input.empty()) {
     return std::nullopt;
   }

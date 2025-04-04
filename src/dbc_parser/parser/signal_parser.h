@@ -6,42 +6,10 @@
 #include <string_view>
 #include <vector>
 
+#include "src/dbc_parser/parser/common_types.h"
+
 namespace dbc_parser {
 namespace parser {
-
-// Forward declarations
-enum class MultiplexType {
-  kNone = 0,       // Not multiplexed
-  kMultiplexor,    // This signal is the multiplexor
-  kMultiplexed     // This signal is multiplexed
-};
-
-enum class SignType {
-  kUnsigned = 0,
-  kSigned = 1
-};
-
-// Structure to hold signal data from DBC file
-struct Signal {
-  std::string name;                   // Signal name
-  int start_bit = 0;                  // Start bit position
-  int signal_size = 0;                // Size in bits (same as 'length')
-  int length = 0;                     // Alias for signal_size to support MessageParser
-  int byte_order = 1;                 // Byte order (1=little endian, 0=big endian)
-  bool is_little_endian = true;       // Internal flag for byte order
-  bool is_signed = false;             // Sign (+ or -)
-  SignType sign = SignType::kUnsigned; // Sign type for MessageParser
-  double factor = 1.0;                // Scaling factor
-  double offset = 0.0;                // Offset
-  double minimum = 0.0;               // Minimum value
-  double maximum = 0.0;               // Maximum value
-  std::string unit;                   // Unit (e.g., "km/h")
-  std::vector<std::string> receivers; // Receiving nodes
-  bool is_multiplexer = false;        // Whether signal is a multiplexer switch
-  std::optional<int> multiplex_value; // Multiplexer value if signal is multiplexed
-  MultiplexType multiplex_type = MultiplexType::kNone; // Multiplexing type for MessageParser
-  int multiplex_value_int = -1;       // Integer version of multiplex_value for MessageParser
-};
 
 // Parser for SG_ entries in DBC files
 class SignalParser {
