@@ -17,6 +17,8 @@
 #include "src/dbc_parser/parser/message_transmitters_parser.h"
 #include "src/dbc_parser/parser/bit_timing_parser.h"
 #include "src/dbc_parser/parser/value_table_parser.h"
+#include "src/dbc_parser/parser/environment_variable_parser.h"
+#include "src/dbc_parser/parser/environment_variable_data_parser.h"
 
 // Instead of including signal_parser.h directly which causes a conflict,
 // forward declare the SignalParser class
@@ -658,6 +660,238 @@ struct action<grammar::signal_key> {
       // 1. Define a common Signal representation or create an adapter
       // 2. Include signal_parser.h in a way that doesn't conflict
       // 3. Parse signals and associate them with their messages
+    }
+  }
+};
+
+// Actions for EV_ section
+template<>
+struct action<grammar::env_var_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_env_var_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::env_var_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.env_var_content.empty()) {
+      std::cout << "Original environment variable content: '" << state.env_var_content << "'" << std::endl;
+      
+      // Parse environment variable directly without using EnvironmentVariableParser
+      std::string content = state.env_var_content;
+      // Remove trailing newlines
+      while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
+        content.pop_back();
+      }
+      
+      // Expected format: EV_ EngineTemp 1 [0|120] "C" 20 0 DUMMY_NODE_VECTOR0 Vector__XXX;
+      // Split by spaces but handle quoted strings and bracket content
+      std::vector<std::string> tokens;
+      bool in_quotes = false;
+      bool in_brackets = false;
+      std::string current_token;
+      
+      for (size_t i = 0; i < content.size(); ++i) {
+        char c = content[i];
+        
+        if (c == '"') {
+          in_quotes = !in_quotes;
+          current_token += c;
+        } else if (c == '[') {
+          in_brackets = true;
+          current_token += c;
+        } else if (c == ']') {
+          in_brackets = false;
+          current_token += c;
+        } else if ((c == ' ' || c == '\t') && !in_quotes && !in_brackets) {
+          if (!current_token.empty()) {
+            tokens.push_back(current_token);
+            current_token.clear();
+          }
+        } else if (c == ';' && !in_quotes && !in_brackets) {
+          // End of the statement
+          if (!current_token.empty()) {
+            tokens.push_back(current_token);
+            current_token.clear();
+          }
+        } else {
+          current_token += c;
+        }
+      }
+      
+      // Add the last token if not empty
+      if (!current_token.empty()) {
+        tokens.push_back(current_token);
+      }
+      
+      // Debug output to see tokens
+      std::cout << "Parsed " << tokens.size() << " tokens:" << std::endl;
+      for (size_t i = 0; i < tokens.size(); ++i) {
+        std::cout << "  " << i << ": '" << tokens[i] << "'" << std::endl;
+      }
+      
+      // Extract values from tokens
+      if (tokens.size() >= 8 && tokens[0] == "EV_") {
+        DbcFile::EnvVar env_var;
+        
+        // Name is the first token after EV_
+        env_var.name = tokens[1];
+        
+        // Type is the second token after EV_
+        env_var.type = std::stoi(tokens[2]);
+        
+        // Parse range [min|max]
+        std::string range = tokens[3];
+        size_t pipe_pos = range.find('|');
+        if (pipe_pos != std::string::npos && range[0] == '[' && range.back() == ']') {
+          std::string min_str = range.substr(1, pipe_pos - 1);
+          std::string max_str = range.substr(pipe_pos + 1, range.size() - pipe_pos - 2);
+          env_var.min_value = std::stod(min_str);
+          env_var.max_value = std::stod(max_str);
+        }
+        
+        // Unit is the fourth token after EV_
+        if (tokens[4][0] == '"' && tokens[4].back() == '"') {
+          env_var.unit = tokens[4].substr(1, tokens[4].size() - 2);
+        } else {
+          env_var.unit = tokens[4];
+        }
+        
+        // Initial value is the fifth token after EV_
+        env_var.initial_value = std::stod(tokens[5]);
+        
+        // EV ID is the sixth token after EV_
+        env_var.ev_id = std::stoi(tokens[6]);
+        
+        // Access type is the seventh token after EV_
+        env_var.access_type = tokens[7];
+        
+        // Access nodes start at the eighth token after EV_ (if present)
+        std::vector<std::string> access_nodes;
+        if (tokens.size() > 8) {
+          for (size_t i = 8; i < tokens.size(); ++i) {
+            std::string node = tokens[i];
+            // Remove trailing commas
+            if (!node.empty() && node.back() == ',') {
+              node.pop_back();
+            }
+            access_nodes.push_back(node);
+          }
+        }
+        env_var.access_nodes = access_nodes;
+        
+        // Store in the environment_variables map with name as the key
+        state.dbc_file.environment_variables[env_var.name] = env_var;
+        state.found_valid_section = true;
+        
+        std::cout << "Successfully parsed environment variable: " << env_var.name << std::endl;
+      } else {
+        std::cout << "Failed to parse environment variable (invalid token count or format)" << std::endl;
+      }
+    } else {
+      std::cout << "Empty environment variable content" << std::endl;
+    }
+  }
+};
+
+// Actions for ENVVAR_DATA_ section
+template<>
+struct action<grammar::env_var_data_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_env_var_data_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::env_var_data_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.env_var_data_content.empty()) {
+      std::cout << "Original environment variable data content: '" << state.env_var_data_content << "'" << std::endl;
+      
+      // Parse environment variable data directly without using EnvironmentVariableDataParser
+      std::string content = state.env_var_data_content;
+      // Remove trailing newlines
+      while (!content.empty() && (content.back() == '\n' || content.back() == '\r')) {
+        content.pop_back();
+      }
+      
+      // Expected format: ENVVAR_DATA_ EngineTemp: 5;
+      // Split by spaces but handle colons and semicolons
+      std::vector<std::string> tokens;
+      std::string current_token;
+      
+      for (size_t i = 0; i < content.size(); ++i) {
+        char c = content[i];
+        
+        if (c == ' ' || c == '\t') {
+          if (!current_token.empty()) {
+            tokens.push_back(current_token);
+            current_token.clear();
+          }
+        } else if (c == ':') {
+          if (!current_token.empty()) {
+            tokens.push_back(current_token);
+            current_token = ":";
+          } else {
+            current_token += c;
+          }
+        } else if (c == ';') {
+          if (!current_token.empty()) {
+            tokens.push_back(current_token);
+            current_token = ";";
+          } else {
+            current_token += c;
+          }
+        } else {
+          current_token += c;
+        }
+      }
+      
+      // Add the last token if not empty
+      if (!current_token.empty()) {
+        tokens.push_back(current_token);
+      }
+      
+      // Debug output to see tokens
+      std::cout << "Parsed " << tokens.size() << " tokens:" << std::endl;
+      for (size_t i = 0; i < tokens.size(); ++i) {
+        std::cout << "  " << i << ": '" << tokens[i] << "'" << std::endl;
+      }
+      
+      // Extract values from tokens
+      if (tokens.size() >= 4 && tokens[0] == "ENVVAR_DATA_") {
+        std::string env_var_name;
+        
+        // Extract environment variable name (remove trailing colon if present)
+        env_var_name = tokens[1];
+        if (env_var_name.back() == ':') {
+          env_var_name.pop_back();
+        }
+        
+        // Update the DBC file only if we have a valid environment variable name
+        if (!env_var_name.empty()) {
+          // Create a new environment variable data entry
+          DbcFile::EnvVarData env_var_data;
+          env_var_data.data_name = env_var_name;
+          
+          // Store in the environment_variable_data map with name as the key
+          state.dbc_file.environment_variable_data[env_var_name] = env_var_data;
+          std::cout << "Created environment variable data for: " << env_var_name << std::endl;
+          
+          state.found_valid_section = true;
+        } else {
+          std::cout << "Failed to extract environment variable name" << std::endl;
+        }
+      } else {
+        std::cout << "Failed to parse environment variable data (invalid token count or format)" << std::endl;
+      }
+    } else {
+      std::cout << "Empty environment variable data content" << std::endl;
     }
   }
 };

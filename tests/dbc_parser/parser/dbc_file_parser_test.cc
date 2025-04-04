@@ -180,12 +180,18 @@ NS_ :
 BS_: 500
 
 BU_: Node1 Node2
+
+EV_ EngineTemp 1 [0|120] "C" 20 0 DUMMY_NODE_VECTOR0 Vector__XXX;
 )";
 
   auto result = parser_->Parse(kInput);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ("2.0", result->version);
   EXPECT_EQ(2, result->nodes.size());
+  
+  // Check environment variables
+  std::cout << "Environment variables count: " << result->environment_variables.size() << std::endl;
+  
   // Not checking new_symbols since it may not be implemented fully
 }
 
@@ -303,6 +309,53 @@ BO_ 123 TestMessage: 8 Node1
   // Verify that the parser processed the signal section (found_valid_section was true)
   // This is checking that our basic signal detection is working
   EXPECT_TRUE(result.has_value());
+}
+
+// Test parsing environment variables section
+TEST_F(DbcFileParserTest, ParsesEnvironmentVariables) {
+  const std::string kInput = R"(
+VERSION "2.0"
+EV_ EngineTemp 1 [0|120] "C" 20 0 DUMMY_NODE_VECTOR0 Vector__XXX;
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("2.0", result->version);
+  
+  // Check environment variables
+  ASSERT_EQ(1, result->environment_variables.size()) << "Expected to find 1 environment variable";
+  ASSERT_TRUE(result->environment_variables.count("EngineTemp") > 0) << "Expected to find EngineTemp";
+  
+  const auto& env_var = result->environment_variables.at("EngineTemp");
+  EXPECT_EQ("EngineTemp", env_var.name);
+  EXPECT_EQ(1, env_var.type);                // Float type
+  EXPECT_DOUBLE_EQ(0.0, env_var.min_value);
+  EXPECT_DOUBLE_EQ(120.0, env_var.max_value);
+  EXPECT_EQ("C", env_var.unit);
+  EXPECT_DOUBLE_EQ(20.0, env_var.initial_value);
+  EXPECT_EQ(0, env_var.ev_id);
+  EXPECT_EQ("DUMMY_NODE_VECTOR0", env_var.access_type);
+  ASSERT_EQ(1, env_var.access_nodes.size());
+  EXPECT_EQ("Vector__XXX", env_var.access_nodes[0]);
+}
+
+// Test parsing environment variable data section
+TEST_F(DbcFileParserTest, ParsesEnvironmentVariableData) {
+  const std::string kInput = R"(
+VERSION "2.0"
+ENVVAR_DATA_ EngineTemp: 5;
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("2.0", result->version);
+  
+  // Check environment variable data
+  ASSERT_EQ(1, result->environment_variable_data.size()) << "Expected to find 1 environment variable data";
+  ASSERT_TRUE(result->environment_variable_data.count("EngineTemp") > 0) << "Expected to find EngineTemp data";
+  
+  const auto& env_var_data = result->environment_variable_data.at("EngineTemp");
+  EXPECT_EQ("EngineTemp", env_var_data.data_name);
 }
 
 }  // namespace
