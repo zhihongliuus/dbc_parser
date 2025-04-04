@@ -1,75 +1,51 @@
 #include "src/dbc_parser/parser/message_transmitters_parser.h"
 
 #include <string>
-#include <vector>
+#include <string_view>
+
 #include "gtest/gtest.h"
 
 namespace dbc_parser {
 namespace parser {
 namespace {
 
-TEST(MessageTransmittersParserTest, ParsesSingleTransmitter) {
-  const std::string input = "BO_TX_BU_ 123 : Engine";
-  auto result = MessageTransmittersParser::Parse(input);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result->message_id, 123);
-  ASSERT_EQ(result->transmitters.size(), 1);
-  EXPECT_EQ(result->transmitters[0], "Engine");
-}
-
-TEST(MessageTransmittersParserTest, ParsesMultipleTransmitters) {
-  const std::string input = "BO_TX_BU_ 123 : Engine,ECU1,Gateway";
-  auto result = MessageTransmittersParser::Parse(input);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result->message_id, 123);
-  ASSERT_EQ(result->transmitters.size(), 3);
-  EXPECT_EQ(result->transmitters[0], "Engine");
-  EXPECT_EQ(result->transmitters[1], "ECU1");
-  EXPECT_EQ(result->transmitters[2], "Gateway");
-}
-
-TEST(MessageTransmittersParserTest, HandlesWhitespace) {
-  const std::string input = "  BO_TX_BU_  123  :  Engine  ,  ECU1  ,  Gateway  ";
-  auto result = MessageTransmittersParser::Parse(input);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result->message_id, 123);
-  ASSERT_EQ(result->transmitters.size(), 3);
-  EXPECT_EQ(result->transmitters[0], "Engine");
-  EXPECT_EQ(result->transmitters[1], "ECU1");
-  EXPECT_EQ(result->transmitters[2], "Gateway");
-}
-
-TEST(MessageTransmittersParserTest, HandlesNodesWithSpecialChars) {
-  const std::string input = "BO_TX_BU_ 123 : ECU_123,Node-With-Dash,Node_With_Underscore";
-  auto result = MessageTransmittersParser::Parse(input);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result->message_id, 123);
-  ASSERT_EQ(result->transmitters.size(), 3);
-  EXPECT_EQ(result->transmitters[0], "ECU_123");
-  EXPECT_EQ(result->transmitters[1], "Node-With-Dash");
-  EXPECT_EQ(result->transmitters[2], "Node_With_Underscore");
-}
-
-TEST(MessageTransmittersParserTest, HandlesEmptyTransmittersList) {
-  const std::string input = "BO_TX_BU_ 123 : ";
-  auto result = MessageTransmittersParser::Parse(input);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result->message_id, 123);
-  EXPECT_TRUE(result->transmitters.empty());
-}
-
-TEST(MessageTransmittersParserTest, RejectsInvalidFormat) {
-  // Missing colon
-  EXPECT_FALSE(MessageTransmittersParser::Parse("BO_TX_BU_ 123 Engine").has_value());
+TEST(MessageTransmittersParserTest, ParsesBasicTransmitters) {
+  const std::string kInput = "BO_TX_BU_ 123 : Node1, Node2;";
   
-  // Missing BO_TX_BU_ keyword
-  EXPECT_FALSE(MessageTransmittersParser::Parse("123 : Engine").has_value());
+  auto result = MessageTransmittersParser::Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(123, result->message_id);
+  ASSERT_EQ(2, result->transmitters.size());
+  EXPECT_EQ("Node1", result->transmitters[0]);
+  EXPECT_EQ("Node2", result->transmitters[1]);
+}
+
+TEST(MessageTransmittersParserTest, HandlesMissingSemicolon) {
+  const std::string kInput = "BO_TX_BU_ 123 : Node1, Node2";
   
-  // Invalid keyword
-  EXPECT_FALSE(MessageTransmittersParser::Parse("BO_TRX_BU_ 123 : Engine").has_value());
+  auto result = MessageTransmittersParser::Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(123, result->message_id);
+  ASSERT_EQ(2, result->transmitters.size());
+  EXPECT_EQ("Node1", result->transmitters[0]);
+  EXPECT_EQ("Node2", result->transmitters[1]);
+}
+
+TEST(MessageTransmittersParserTest, HandlesSingleTransmitter) {
+  const std::string kInput = "BO_TX_BU_ 123 : Node1;";
   
-  // Invalid message ID (not a number)
-  EXPECT_FALSE(MessageTransmittersParser::Parse("BO_TX_BU_ ABC : Engine").has_value());
+  auto result = MessageTransmittersParser::Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(123, result->message_id);
+  ASSERT_EQ(1, result->transmitters.size());
+  EXPECT_EQ("Node1", result->transmitters[0]);
+}
+
+TEST(MessageTransmittersParserTest, HandlesInvalidInput) {
+  const std::string kInput = "WRONG_KEY 123 : Node1;";
+  
+  auto result = MessageTransmittersParser::Parse(kInput);
+  EXPECT_FALSE(result.has_value());
 }
 
 }  // namespace

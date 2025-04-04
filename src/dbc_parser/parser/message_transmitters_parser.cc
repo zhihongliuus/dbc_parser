@@ -13,7 +13,7 @@ std::optional<MessageTransmitters> MessageTransmittersParser::Parse(std::string_
   if (input.empty()) {
     return std::nullopt;
   }
-
+  
   std::string input_str(input);
   std::istringstream iss(input_str);
   std::string token;
@@ -44,13 +44,21 @@ std::optional<MessageTransmitters> MessageTransmittersParser::Parse(std::string_
   result.message_id = message_id;
   
   // Parse transmitters (rest of the line)
-  std::getline(iss, token);
-  if (token.empty()) {
+  std::string rest_of_line;
+  std::getline(iss, rest_of_line);
+  
+  // Remove trailing semicolon
+  if (!rest_of_line.empty() && rest_of_line.back() == ';') {
+    rest_of_line.pop_back();
+  }
+  
+  // Skip if the line is empty after removing the semicolon
+  if (rest_of_line.empty()) {
     return result;  // No transmitters
   }
   
   // Split the transmitter list by commas
-  std::istringstream transmitter_stream(token);
+  std::istringstream transmitter_stream(rest_of_line);
   std::string transmitter;
   while (std::getline(transmitter_stream, transmitter, ',')) {
     // Trim leading/trailing whitespace

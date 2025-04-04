@@ -85,10 +85,11 @@ BO_ 123 TestMessage: 8 Node1
 
 // Test parsing message transmitters section
 TEST_F(DbcFileParserTest, ParsesMessageTransmitters) {
+  // This test specifically focuses on the BO_TX_BU_ section
   const std::string kInput = R"(
 VERSION "2.0"
 BO_ 123 TestMessage: 8 Node1
-BO_TX_BU_ 123 : Node1, Node2
+BO_TX_BU_ 123 : Node1, Node2;
 )";
 
   auto result = parser_->Parse(kInput);
@@ -96,16 +97,26 @@ BO_TX_BU_ 123 : Node1, Node2
   EXPECT_EQ("2.0", result->version);
   EXPECT_EQ(1, result->messages.size());
   
-  // Check if message_transmitters are implemented
-  if (!result->message_transmitters.empty()) {
-    ASSERT_EQ(1, result->message_transmitters.size());
-    ASSERT_EQ(2, result->message_transmitters[123].size());
-    EXPECT_EQ("Node1", result->message_transmitters[123][0]);
-    EXPECT_EQ("Node2", result->message_transmitters[123][1]);
-  } else {
-    // Skip the assertion if not implemented yet
-    GTEST_SKIP() << "Message transmitters parsing not fully implemented yet";
-  }
+  // For debugging, print the number of transmitters
+  std::cout << "Number of message transmitters: " << result->message_transmitters.size() << std::endl;
+  
+  ASSERT_EQ(1, result->message_transmitters.size()) << "Expected to find message transmitters for message ID 123";
+  ASSERT_EQ(2, result->message_transmitters[123].size()) << "Expected 2 transmitters for message ID 123";
+  EXPECT_EQ("Node1", result->message_transmitters[123][0]);
+  EXPECT_EQ("Node2", result->message_transmitters[123][1]);
+}
+
+// Test bit timing section
+TEST_F(DbcFileParserTest, ParsesBitTiming) {
+  const std::string kInput = R"(
+VERSION "2.0"
+BS_: 500
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("2.0", result->version);
+  // We're not checking bit_timing as it's not fully implemented yet
 }
 
 // Test parsing multiple sections
@@ -143,7 +154,7 @@ NS_ :
     BU_BO_REL_
     SG_MUL_VAL_
 
-BS_:
+BS_: 500
 
 BU_: Node1 Node2
 )";
@@ -186,6 +197,66 @@ BU_: Node1 Node2
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ("2.0", result->version);
   ASSERT_EQ(2, result->nodes.size());
+}
+
+// Test that parse errors are handled properly
+TEST_F(DbcFileParserTest, HandlesPegtlParseErrors) {
+  // Create an intentionally malformed input that would trigger a PEGTL parse error
+  // This is a bit contrived but should trigger the exception handling
+  const std::string kInput = "VERSION \"unclosed string\nBU_: Node1 Node2";
+  
+  // The parser should catch any PEGTL exceptions and return nullopt
+  auto result = parser_->Parse(kInput);
+  EXPECT_FALSE(result.has_value());
+}
+
+// Test complex DBC file
+TEST_F(DbcFileParserTest, ParsesComplexDbcFile) {
+  // Test a more complex DBC file with multiple sections in typical order
+  const std::string kInput = R"(
+VERSION "2.0"
+
+NS_ : 
+    NS_DESC_
+    CM_
+
+BS_: 500
+
+BU_: ECU1 ECU2 ECU3
+
+BO_ 100 Engine: 8 ECU1
+BO_ 200 Transmission: 8 ECU2
+BO_ 300 Brakes: 8 ECU3
+
+BO_TX_BU_ 100 : ECU1;
+BO_TX_BU_ 200 : ECU2;
+BO_TX_BU_ 300 : ECU3;
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("2.0", result->version);
+  
+  // Check nodes
+  ASSERT_EQ(3, result->nodes.size());
+  EXPECT_EQ("ECU1", result->nodes[0]);
+  EXPECT_EQ("ECU2", result->nodes[1]);
+  EXPECT_EQ("ECU3", result->nodes[2]);
+  
+  // Check messages
+  ASSERT_EQ(3, result->messages.size());
+  EXPECT_EQ("Engine", result->messages[100]);
+  EXPECT_EQ("Transmission", result->messages[200]);
+  EXPECT_EQ("Brakes", result->messages[300]);
+  
+  // Check message transmitters
+  ASSERT_EQ(3, result->message_transmitters.size()) << "Expected to find message transmitters";
+  ASSERT_EQ(1, result->message_transmitters[100].size());
+  EXPECT_EQ("ECU1", result->message_transmitters[100][0]);
+  ASSERT_EQ(1, result->message_transmitters[200].size());
+  EXPECT_EQ("ECU2", result->message_transmitters[200][0]);
+  ASSERT_EQ(1, result->message_transmitters[300].size());
+  EXPECT_EQ("ECU3", result->message_transmitters[300][0]);
 }
 
 }  // namespace

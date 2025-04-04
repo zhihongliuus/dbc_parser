@@ -187,17 +187,25 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "signal",
+    hdrs = ["signal.h"],
+    deps = [],
+    visibility = ["//visibility:public"],
+)
+
 # DBC File Parser - main parser that integrates all others
 cc_library(
     name = "dbc_file_parser",
     srcs = ["dbc_file_parser.cc"],
     hdrs = ["dbc_file_parser.h"],
     deps = [
-        ":version_parser",
-        ":new_symbols_parser",
-        ":nodes_parser",
+        ":bit_timing_parser",
         ":message_parser",
         ":message_transmitters_parser",
+        ":new_symbols_parser",
+        ":nodes_parser",
+        ":version_parser",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
