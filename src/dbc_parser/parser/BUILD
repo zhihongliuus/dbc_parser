@@ -3,6 +3,9 @@ cc_library(
     srcs = ["version_parser.cc"],
     hdrs = ["version_parser.h"],
     deps = [
+        ":common_grammar",
+        ":parser_base",
+        ":parser_state",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
     ],
@@ -37,8 +40,9 @@ cc_library(
     srcs = ["nodes_parser.cc"],
     hdrs = ["nodes_parser.h"],
     deps = [
+        ":common_grammar",
         ":common_types",
-        "//src/dbc_parser/core:string_utils",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -209,6 +213,32 @@ cc_library(
 cc_library(
     name = "common_types",
     hdrs = ["common_types.h"],
+    deps = [],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "common_grammar",
+    hdrs = ["common_grammar.h"],
+    deps = [
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "parser_base",
+    hdrs = ["parser_base.h"],
+    deps = [
+        ":parser_state",
+        "//third_party/pegtl:pegtl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "parser_state",
+    hdrs = ["parser_state.h"],
     deps = [],
     visibility = ["//visibility:public"],
 )

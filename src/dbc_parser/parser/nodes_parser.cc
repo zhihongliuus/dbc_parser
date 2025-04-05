@@ -8,6 +8,8 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -15,17 +17,18 @@ namespace pegtl = tao::pegtl;
 
 // Grammar rules for BU_ (Nodes) parsing
 namespace grammar {
-
-// BU_ keyword
-struct bu_keyword : pegtl::string<'B', 'U', '_'> {};
-
-// Colon separator
-struct colon : pegtl::one<':'> {};
+// Use common grammar elements
+using alpha = common_grammar::alpha;
+using digit = common_grammar::digit;
+using bu_keyword = common_grammar::bu_keyword;
+using colon = common_grammar::colon;
+using ws = common_grammar::ws;
+using req_ws = common_grammar::req_ws;
 
 // A node name character
 struct node_name_char : pegtl::sor<
-                         pegtl::alpha,
-                         pegtl::digit,
+                         alpha,
+                         digit,
                          pegtl::one<'_'>,
                          pegtl::one<'-'>
                        > {};
@@ -35,13 +38,13 @@ struct node_name : pegtl::plus<node_name_char> {};
 
 // Complete BU_ rule
 struct bu_rule : pegtl::seq<
-                   pegtl::opt<pegtl::star<pegtl::space>>,
+                   ws,
                    bu_keyword,
-                   pegtl::opt<pegtl::star<pegtl::space>>,
+                   ws,
                    colon,
-                   pegtl::opt<pegtl::star<pegtl::space>>,
-                   pegtl::opt<pegtl::list<node_name, pegtl::plus<pegtl::space>>>,
-                   pegtl::opt<pegtl::star<pegtl::space>>,
+                   ws,
+                   pegtl::opt<pegtl::list<node_name, req_ws>>,
+                   ws,
                    pegtl::eof
                  > {};
 
@@ -68,12 +71,13 @@ struct action<grammar::node_name> {
 };
 
 std::optional<std::vector<Node>> NodesParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Validate input
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
 
   // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "BU_");
+  pegtl::memory_input<> in = CreateInput(input, "BU_");
   
   // Create state to collect results
   nodes_state state;

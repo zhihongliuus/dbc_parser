@@ -5,6 +5,9 @@
 #include <string>
 #include <string_view>
 
+#include "src/dbc_parser/parser/parser_base.h"
+#include "src/dbc_parser/parser/parser_state.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -14,9 +17,14 @@ struct Version {
 };
 
 // Parser for DBC VERSION
-class VersionParser {
+class VersionParser : public ParserBase {
  public:
-  // Parses a VERSION string and returns a Version object if successful
+  /**
+   * Parses a VERSION string and returns a Version object if successful
+   * 
+   * @param input The input string to parse
+   * @return An optional containing the Version object if successful, nullopt otherwise
+   */
   static std::optional<Version> Parse(std::string_view input);
 };
 

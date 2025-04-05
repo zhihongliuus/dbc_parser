@@ -7,12 +7,13 @@
 #include <vector>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
 
 // Parser for nodes list (BU_) in DBC files
-class NodesParser {
+class NodesParser : public ParserBase {
  public:
   // Parses a nodes section from the given input and returns a vector of Node objects
   // Returns std::nullopt if parsing fails

@@ -7,6 +7,9 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
 
+#include "src/dbc_parser/core/string_utils.h"
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -14,22 +17,14 @@ namespace pegtl = tao::pegtl;
 
 // Grammar rules for VERSION parsing
 namespace grammar {
-
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
-
-// VERSION keyword
-struct version_keyword : pegtl::string<'V', 'E', 'R', 'S', 'I', 'O', 'N'> {};
-
-// Rules for quoted strings with escaping
-struct escaped_char : pegtl::seq<pegtl::one<'\\'>, pegtl::any> {};
-struct regular_char : pegtl::not_one<'"', '\\'> {};
-struct quoted_string_content : pegtl::star<pegtl::sor<escaped_char, regular_char>> {};
-struct quoted_string : pegtl::seq<pegtl::one<'"'>, quoted_string_content, pegtl::one<'"'>> {};
+// Use common grammar elements
+using version_keyword = common_grammar::version_keyword;
+using ws = common_grammar::ws;
+using quoted_string = common_grammar::quoted_string;
+using string_content = common_grammar::string_content;
 
 // Complete VERSION rule
 struct version_rule : pegtl::seq<ws, version_keyword, ws, quoted_string, ws, pegtl::eof> {};
-
 } // namespace grammar
 
 // Data structure to collect parsing results
@@ -44,7 +39,7 @@ struct version_action : pegtl::nothing<Rule> {};
 
 // Action for extracting quoted string content
 template<>
-struct version_action<grammar::quoted_string_content> {
+struct version_action<grammar::string_content> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, version_state& state) {
     std::string content = in.string();
@@ -76,8 +71,13 @@ struct version_action<grammar::quoted_string_content> {
 };
 
 std::optional<Version> VersionParser::Parse(std::string_view input) {
+  // Validate input
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
+
   // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "VERSION");
+  pegtl::memory_input<> in = CreateInput(input, "VERSION");
   
   // Create state to collect results
   version_state state;
