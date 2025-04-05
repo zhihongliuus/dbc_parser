@@ -1,8 +1,8 @@
 #include "src/dbc_parser/parser/comment_parser.h"
 
 #include <cstdlib>
+#include <iostream>
 #include <optional>
-#include <regex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -65,15 +65,15 @@ struct network_comment : pegtl::seq<
 struct node_comment : pegtl::seq<
     cm_prefix, ws,
     bu_type, required_ws,
-    node_name, ws,
+    quoted_string, ws,  // Use quoted_string for node name
     quoted_string, ws,
     semicolon
 > {};
 
 struct message_comment : pegtl::seq<
     cm_prefix, ws,
-    bo_type, required_ws,
-    message_id, ws,
+    bo_type, ws,  // More flexible whitespace handling
+    message_id, ws,  // Don't require whitespace here
     quoted_string, ws,
     semicolon
 > {};
@@ -82,7 +82,7 @@ struct signal_comment : pegtl::seq<
     cm_prefix, ws,
     sg_type, required_ws,
     message_id, required_ws,
-    signal_name, ws,
+    quoted_string, ws,  // Use quoted_string for signal name
     quoted_string, ws,
     semicolon
 > {};
@@ -90,7 +90,7 @@ struct signal_comment : pegtl::seq<
 struct env_var_comment : pegtl::seq<
     cm_prefix, ws,
     ev_type, required_ws,
-    env_var_name, ws,
+    quoted_string, ws,  // Use quoted_string for env var name
     quoted_string, ws,
     semicolon
 > {};
@@ -116,6 +116,9 @@ struct comment_state {
     std::pair<int, std::string>    // SIGNAL
   > identifier;
   std::optional<std::string> text;
+  
+  // Additional tracking for quoted strings
+  bool is_first_quoted_string = true;
 
   bool is_complete() const {
     return text.has_value() && 
@@ -123,6 +126,28 @@ struct comment_state {
         ((type == CommentType::NODE || type == CommentType::ENV_VAR) && std::holds_alternative<std::string>(identifier)) ||
         (type == CommentType::MESSAGE && std::holds_alternative<int>(identifier)) ||
         (type == CommentType::SIGNAL && std::holds_alternative<std::pair<int, std::string>>(identifier)));
+  }
+};
+
+// Debug helper to trace parsing
+template<typename Rule>
+struct tracer : pegtl::normal<Rule> {
+  template<typename Input>
+  static void start(const Input& in, comment_state& state) {
+    std::cout << "Starting to match rule " << typeid(Rule).name() << " at position " << in.position() << std::endl;
+    pegtl::normal<Rule>::start(in, state);
+  }
+
+  template<typename Input>
+  static void success(const Input& in, comment_state& state) {
+    std::cout << "Successfully matched rule " << typeid(Rule).name() << " at position " << in.position() << std::endl;
+    pegtl::normal<Rule>::success(in, state);
+  }
+
+  template<typename Input>
+  static void failure(const Input& in, comment_state& state) {
+    std::cout << "Failed to match rule " << typeid(Rule).name() << " at position " << in.position() << std::endl;
+    pegtl::normal<Rule>::failure(in, state);
   }
 };
 
@@ -134,26 +159,52 @@ template<>
 struct action<grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, comment_state& state) {
-    if (!state.text.has_value()) {
-      // Remove the quotes and unescape special characters
-      std::string text = in.string();
-      if (text.size() >= 2) {
-        text = text.substr(1, text.size() - 2);
-        
-        // Unescape special characters (like \" -> ")
-        std::string unescaped;
-        bool escaped = false;
-        for (char c : text) {
-          if (escaped) {
-            unescaped += c;
-            escaped = false;
-          } else if (c == '\\') {
-            escaped = true;
-          } else {
-            unescaped += c;
-          }
+    std::string content = in.string();
+    if (content.size() >= 2) {
+      // Remove surrounding quotes
+      content = content.substr(1, content.size() - 2);
+      
+      // Unescape special characters
+      std::string unescaped;
+      bool escaped = false;
+      for (char c : content) {
+        if (escaped) {
+          unescaped += c;
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else {
+          unescaped += c;
         }
-        
+      }
+      
+      // For NODE, ENV_VAR, and SIGNAL types, we need to handle identifier differently
+      if (state.is_first_quoted_string) {
+        if (state.type == CommentType::NETWORK) {
+          // For NETWORK, the first string is always the text
+          state.text = unescaped;
+          state.is_first_quoted_string = false;
+        } else if (state.type == CommentType::NODE) {
+          // For NODE, the first string is the node name
+          state.identifier = unescaped;
+          state.is_first_quoted_string = false;
+        } else if (state.type == CommentType::ENV_VAR) {
+          // For ENV_VAR, the first string is the env var name
+          state.identifier = unescaped;
+          state.is_first_quoted_string = false;
+        } else if (state.type == CommentType::MESSAGE) {
+          // For MESSAGE, the first string is the comment text since message_id is already set
+          state.text = unescaped;
+          state.is_first_quoted_string = false;
+        } else if (state.type == CommentType::SIGNAL && 
+                  std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
+          // For SIGNAL, update the signal name in the pair
+          auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
+          pair.second = unescaped;
+          state.is_first_quoted_string = false;
+        }
+      } else {
+        // For all types, the second string is the comment text
         state.text = unescaped;
       }
     }
@@ -166,6 +217,7 @@ struct action<grammar::bu_type> {
   static void apply(const ActionInput& in, comment_state& state) {
     state.type = CommentType::NODE;
     state.identifier = std::monostate{};  // Reset the variant
+    state.is_first_quoted_string = true;  // Reset string counter
   }
 };
 
@@ -175,6 +227,7 @@ struct action<grammar::bo_type> {
   static void apply(const ActionInput& in, comment_state& state) {
     state.type = CommentType::MESSAGE;
     state.identifier = std::monostate{};  // Reset the variant
+    state.is_first_quoted_string = true;  // Reset string counter
   }
 };
 
@@ -184,6 +237,7 @@ struct action<grammar::sg_type> {
   static void apply(const ActionInput& in, comment_state& state) {
     state.type = CommentType::SIGNAL;
     state.identifier = std::monostate{};  // Reset the variant
+    state.is_first_quoted_string = true;  // Reset string counter
   }
 };
 
@@ -193,26 +247,7 @@ struct action<grammar::ev_type> {
   static void apply(const ActionInput& in, comment_state& state) {
     state.type = CommentType::ENV_VAR;
     state.identifier = std::monostate{};  // Reset the variant
-  }
-};
-
-template<>
-struct action<grammar::node_name> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, comment_state& state) {
-    if (state.type == CommentType::NODE) {
-      state.identifier = in.string();
-    }
-  }
-};
-
-template<>
-struct action<grammar::env_var_name> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, comment_state& state) {
-    if (state.type == CommentType::ENV_VAR) {
-      state.identifier = in.string();
-    }
+    state.is_first_quoted_string = true;  // Reset string counter
   }
 };
 
@@ -237,34 +272,29 @@ struct action<grammar::message_id> {
   }
 };
 
-template<>
-struct action<grammar::signal_name> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, comment_state& state) {
-    if (state.type == CommentType::SIGNAL && std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
-      // Update the signal name in the pair
-      auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
-      pair.second = in.string();
-    }
-  }
-};
-
 std::optional<Comment> CommentParser::Parse(std::string_view input) {
-  // Quick check for required syntax elements before using PEGTL
+  // Quick check for required syntax elements
   if (input.empty() || input[input.length() - 1] != ';') {
     return std::nullopt;
   }
 
   comment_state state;
   
+  // Debug the input
+  std::cout << "Parsing comment: '" << input << "'" << std::endl;
+  
   pegtl::memory_input in(input.data(), input.size(), "");
   try {
-    pegtl::parse<grammar::comment_rule, action>(in, state);
+    // Use tracer for detailed debugging
+    pegtl::parse<grammar::comment_rule, action, tracer>(in, state);
+    // pegtl::parse<grammar::comment_rule, action>(in, state);
   } catch (const pegtl::parse_error& e) {
+    std::cerr << "Parse error: " << e.what() << std::endl;
     return std::nullopt;
   }
 
   if (!state.is_complete() || (state.text.has_value() && state.text->empty())) {
+    std::cerr << "Incomplete comment parsing" << std::endl;
     return std::nullopt;
   }
 

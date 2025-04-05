@@ -7,27 +7,10 @@
 #include <vector>
 #include <variant>
 
+#include "src/dbc_parser/parser/common_types.h"
+
 namespace dbc_parser {
 namespace parser {
-
-// The object type to which an attribute applies
-enum class AttributeObjectType {
-  UNDEFINED,
-  NETWORK,  // Global attribute for the entire network
-  NODE,     // Applies to a node (BU_)
-  MESSAGE,  // Applies to a message (BO_)
-  SIGNAL,   // Applies to a signal (SG_)
-  ENV_VAR   // Applies to an environment variable (EV_)
-};
-
-// Type of attribute value
-enum class AttributeValueType {
-  INT,      // Integer value
-  HEX,      // Hexadecimal value
-  FLOAT,    // Floating point value
-  STRING,   // String value
-  ENUM      // Enumeration value
-};
 
 // Structure to hold attribute definition data
 struct AttributeDefinition {

@@ -1,10 +1,15 @@
-#include "src/dbc_parser/parser/dbc_file_parser.h"
-
+#include <fstream>
+#include <sstream>
 #include <string>
-#include <string_view>
-#include <map>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/dbc_file_parser.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -184,13 +189,31 @@ BU_: Node1 Node2
 EV_ EngineTemp 1 [0|120] "C" 20 0 DUMMY_NODE_VECTOR0 Vector__XXX;
 )";
 
+  std::cout << "Test input for ParsesMultipleSections (showing each line):" << std::endl;
+  std::string input_str(kInput);
+  std::istringstream iss(input_str);
+  std::string line;
+  while (std::getline(iss, line)) {
+    std::cout << "Line: '" << line << "'" << std::endl;
+  }
+  
   auto result = parser_->Parse(kInput);
+  
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ("2.0", result->version);
+  
+  std::cout << "Nodes count: " << result->nodes.size() << std::endl;
+  for (const auto& node : result->nodes) {
+    std::cout << "  Node: '" << node << "'" << std::endl;
+  }
+  
   EXPECT_EQ(2, result->nodes.size());
   
   // Check environment variables
   std::cout << "Environment variables count: " << result->environment_variables.size() << std::endl;
+  for(const auto& [name, var] : result->environment_variables) {
+    std::cout << "  Env var: '" << name << "'" << std::endl;
+  }
   
   // Not checking new_symbols since it may not be implemented fully
 }
@@ -362,12 +385,11 @@ ENVVAR_DATA_ EngineTemp: 5;
 TEST_F(DbcFileParserTest, ParsesComments) {
   const std::string kInput = R"(
 VERSION "1.0"
-
 CM_ "Network comment";
-CM_ BU_ Node1 "Node comment";
+CM_ BU_ "Node1" "Node comment";
 CM_ BO_ 123 "Message comment";
-CM_ SG_ 123 Signal1 "Signal comment";
-CM_ EV_ EnvVar1 "Environment variable comment";
+CM_ SG_ 123 "EngineSpeed" "Signal comment";
+CM_ EV_ "EnvironmentVar" "EnvVar comment";
 )";
   
   auto result = parser_->Parse(kInput);
@@ -379,7 +401,7 @@ CM_ EV_ EnvVar1 "Environment variable comment";
   // Check the network comment
   bool found_network_comment = false;
   for (const auto& comment : result->comments) {
-    if (comment.type == DbcFile::CommentDef::Type::Network && 
+    if (comment.type == CommentType::NETWORK && 
         comment.text == "Network comment") {
       found_network_comment = true;
       break;
@@ -390,7 +412,7 @@ CM_ EV_ EnvVar1 "Environment variable comment";
   // Check the node comment
   bool found_node_comment = false;
   for (const auto& comment : result->comments) {
-    if (comment.type == DbcFile::CommentDef::Type::Node && 
+    if (comment.type == CommentType::NODE && 
         comment.object_name == "Node1" &&
         comment.text == "Node comment") {
       found_node_comment = true;
@@ -402,7 +424,7 @@ CM_ EV_ EnvVar1 "Environment variable comment";
   // Check the message comment
   bool found_message_comment = false;
   for (const auto& comment : result->comments) {
-    if (comment.type == DbcFile::CommentDef::Type::Message && 
+    if (comment.type == CommentType::MESSAGE && 
         comment.object_id == 123 &&
         comment.text == "Message comment") {
       found_message_comment = true;
@@ -510,6 +532,109 @@ SIG_GROUP_ 456 BrakeGroup 2 : BrakeForce,BrakePosition;
     }
   }
   EXPECT_TRUE(found_brake_group) << "Failed to find BrakeGroup signal group";
+}
+
+// Test parsing attribute definitions
+TEST_F(DbcFileParserTest, ParsesAttributeDefinitions) {
+  const std::string kInput = R"(
+VERSION "1.0"
+BA_DEF_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_ BO_ "GenMsgSendType" ENUM "Cyclic","Event","CyclicIfActive","SpontanWithDelay","CyclicAndSpontaneous","CyclicAndEvent";
+BA_DEF_ SG_ "GenSigStartValue" FLOAT 0 100000;
+)";
+  
+  auto result = parser_->Parse(kInput);
+  
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->version, "1.0");
+  ASSERT_EQ(result->attribute_definitions.size(), 3);
+  
+  // Check the first attribute definition (Network INT attribute)
+  bool found_cycle_time = false;
+  for (const auto& attr_def : result->attribute_definitions) {
+    if (attr_def.name == "GenMsgCycleTime" && 
+        attr_def.type == AttributeObjectType::NETWORK &&
+        attr_def.value_type == AttributeValueType::INT) {
+      // Check min/max values
+      EXPECT_DOUBLE_EQ(attr_def.min, 0.0);
+      EXPECT_DOUBLE_EQ(attr_def.max, 65535.0);
+      found_cycle_time = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_cycle_time) << "Failed to find GenMsgCycleTime attribute definition";
+  
+  // Check the second attribute definition (Message ENUM attribute)
+  bool found_send_type = false;
+  for (const auto& attr_def : result->attribute_definitions) {
+    if (attr_def.name == "GenMsgSendType" && 
+        attr_def.type == AttributeObjectType::MESSAGE &&
+        attr_def.value_type == AttributeValueType::ENUM) {
+      // Check enum values
+      ASSERT_EQ(attr_def.enum_values.size(), 6);
+      EXPECT_EQ(attr_def.enum_values[0], "Cyclic");
+      EXPECT_EQ(attr_def.enum_values[1], "Event");
+      EXPECT_EQ(attr_def.enum_values[2], "CyclicIfActive");
+      EXPECT_EQ(attr_def.enum_values[3], "SpontanWithDelay");
+      EXPECT_EQ(attr_def.enum_values[4], "CyclicAndSpontaneous");
+      EXPECT_EQ(attr_def.enum_values[5], "CyclicAndEvent");
+      found_send_type = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_send_type) << "Failed to find GenMsgSendType attribute definition";
+  
+  // Check the third attribute definition (Signal FLOAT attribute)
+  bool found_start_value = false;
+  for (const auto& attr_def : result->attribute_definitions) {
+    if (attr_def.name == "GenSigStartValue" && 
+        attr_def.type == AttributeObjectType::SIGNAL &&
+        attr_def.value_type == AttributeValueType::FLOAT) {
+      // Check min/max values
+      EXPECT_DOUBLE_EQ(attr_def.min, 0.0);
+      EXPECT_DOUBLE_EQ(attr_def.max, 100000.0);
+      found_start_value = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_start_value) << "Failed to find GenSigStartValue attribute definition";
+}
+
+// Test parsing attribute definition defaults
+TEST_F(DbcFileParserTest, ParsesAttributeDefinitionDefaults) {
+  const std::string kInput = R"(
+VERSION "1.0"
+BA_DEF_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_ BO_ "GenMsgSendType" ENUM "Cyclic","Event","CyclicIfActive","SpontanWithDelay","CyclicAndSpontaneous","CyclicAndEvent";
+BA_DEF_ SG_ "GenSigStartValue" FLOAT 0 100000;
+BA_DEF_DEF_ "GenMsgCycleTime" 100;
+BA_DEF_DEF_ "GenMsgSendType" 0;
+BA_DEF_DEF_ "GenSigStartValue" 0;
+)";
+  
+  std::cout << "Test input for attribute definition defaults (showing each line):" << std::endl;
+  std::istringstream iss(kInput);
+  std::string line;
+  while (std::getline(iss, line)) {
+    std::cout << "Line: '" << line << "'" << std::endl;
+  }
+  
+  auto result = parser_->Parse(kInput);
+  
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->version, "1.0");
+  ASSERT_EQ(result->attribute_definitions.size(), 3);
+  ASSERT_EQ(result->attribute_defaults.size(), 3);
+  
+  // Check attribute defaults
+  ASSERT_TRUE(result->attribute_defaults.count("GenMsgCycleTime") > 0);
+  EXPECT_EQ(result->attribute_defaults.at("GenMsgCycleTime"), "100");
+  
+  ASSERT_TRUE(result->attribute_defaults.count("GenMsgSendType") > 0);
+  EXPECT_EQ(result->attribute_defaults.at("GenMsgSendType"), "0");
+  
+  ASSERT_TRUE(result->attribute_defaults.count("GenSigStartValue") > 0);
+  EXPECT_EQ(result->attribute_defaults.at("GenSigStartValue"), "0");
 }
 
 }  // namespace

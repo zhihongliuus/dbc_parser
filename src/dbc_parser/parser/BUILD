@@ -169,6 +169,7 @@ cc_library(
     srcs = ["attribute_definition_parser.cc"],
     hdrs = ["attribute_definition_parser.h"],
     deps = [
+        ":common_types",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -230,6 +231,8 @@ cc_library(
         ":version_parser",
         ":signal_value_type_parser",
         ":signal_group_parser",
+        ":attribute_definition_parser",
+        ":attribute_definition_default_parser",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

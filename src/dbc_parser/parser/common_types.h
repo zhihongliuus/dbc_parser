@@ -34,6 +34,25 @@ enum class CommentType {
   ENV_VAR = 4
 };
 
+// The object type to which an attribute applies
+enum class AttributeObjectType {
+  UNDEFINED,
+  NETWORK,  // Global attribute for the entire network
+  NODE,     // Applies to a node (BU_)
+  MESSAGE,  // Applies to a message (BO_)
+  SIGNAL,   // Applies to a signal (SG_)
+  ENV_VAR   // Applies to an environment variable (EV_)
+};
+
+// Type of attribute value
+enum class AttributeValueType {
+  INT,      // Integer value
+  HEX,      // Hexadecimal value (treated as INT in many operations)
+  FLOAT,    // Floating point value
+  STRING,   // String value
+  ENUM      // Enumeration value
+};
+
 // Basic signal structure used across the parser
 struct Signal {
   std::string name;                   // Signal name

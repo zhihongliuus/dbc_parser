@@ -81,14 +81,7 @@ struct DbcFile {
   
   // CM_ : comments
   struct CommentDef {
-    enum class Type { 
-      Network, 
-      Node, 
-      Message, 
-      Signal, 
-      EnvVar 
-    };
-    Type type;
+    CommentType type;
     std::string object_name; // For Node, EnvVar
     int object_id = 0;       // For Message
     int signal_index = 0;    // For Signal (within Message)
@@ -98,22 +91,9 @@ struct DbcFile {
   
   // BA_DEF_ : attribute definitions
   struct AttributeDef {
-    enum class Type { 
-      Network, 
-      Node, 
-      Message, 
-      Signal, 
-      EnvVar 
-    };
-    enum class ValueType { 
-      Int, 
-      Float, 
-      String, 
-      Enum 
-    };
     std::string name;
-    Type type;
-    ValueType value_type;
+    AttributeObjectType type;
+    AttributeValueType value_type;
     std::vector<std::string> enum_values; // For Enum type
     double min = 0.0;                    // For Int/Float
     double max = 0.0;                    // For Int/Float

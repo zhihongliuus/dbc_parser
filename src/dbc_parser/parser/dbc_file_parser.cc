@@ -9,6 +9,7 @@
 #include <utility>
 #include <variant>
 #include <sstream>
+#include <regex>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/analyze.hpp>
@@ -26,6 +27,8 @@
 #include "src/dbc_parser/parser/comment_parser.h"
 #include "src/dbc_parser/parser/signal_value_type_parser.h"
 #include "src/dbc_parser/parser/signal_group_parser.h"
+#include "src/dbc_parser/parser/attribute_definition_parser.h"
+#include "src/dbc_parser/parser/attribute_definition_default_parser.h"
 
 
 // Only include parsers that are actually used in this file
@@ -235,29 +238,46 @@ struct sig_mul_val_section : pegtl::seq<
 // Any line with content (for skipping unknown lines)
 struct any_line : pegtl::seq<pegtl::not_at<eol>, pegtl::until<eol>> {};
 
+// Add a more specific rule for BA_DEF_DEF_
+struct attr_def_def_rule : pegtl::seq<
+                            ws, 
+                            attr_def_def_key, 
+                            ws, 
+                            pegtl::plus<pegtl::not_at<pegtl::one<';'>>, pegtl::any>, 
+                            pegtl::one<';'>, 
+                            ws, 
+                            pegtl::eol> {};
+
+// Add a new rule that captures only the attr_def_def_key at the start of a line
+struct direct_attr_def_def_line : pegtl::seq<
+                             pegtl::at<attr_def_def_key>,  // Look ahead for the key
+                             pegtl::plus<pegtl::any>,  // Capture the rest of the line
+                             pegtl::eol> {};
+
 // Main grammar rule
 struct dbc_file : pegtl::until<pegtl::eof, 
-                    pegtl::sor<
-                      version_section,
-                      new_symbols_section,
-                      bit_timing_section,
-                      nodes_section,
-                      value_table_section,
-                      message_section,
-                      message_transmitters_section,
-                      env_var_section,
-                      env_var_data_section,
-                      comment_section,
-                      signal_key,
-                      attr_def_section,
-                      attr_def_def_section,
-                      attr_section,
-                      value_desc_section,
-                      sig_val_type_section,
-                      sig_group_section,
-                      sig_mul_val_section,
-                      ignored,
-                      any_line>> {};
+                  pegtl::sor<
+                    version_section,
+                    new_symbols_section,
+                    bit_timing_section,
+                    nodes_section,
+                    value_table_section,
+                    message_section,
+                    message_transmitters_section,
+                    env_var_section,
+                    env_var_data_section,
+                    comment_section,
+                    signal_key,
+                    attr_def_section,
+                    attr_def_def_rule,
+                    direct_attr_def_def_line,
+                    attr_section,
+                    value_desc_section,
+                    sig_val_type_section,
+                    sig_group_section,
+                    sig_mul_val_section,
+                    ignored,
+                    any_line>> {};
 
 } // namespace grammar
 
@@ -813,6 +833,142 @@ struct action<grammar::sig_group_section> {
   }
 };
 
+// Actions for BA_DEF_ section (attribute definition)
+template<>
+struct action<grammar::attr_def_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_attr_def_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::attr_def_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.attr_def_content.empty()) {
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.attr_def_content);
+      
+      auto attr_def_result = AttributeDefinitionParser::Parse(content);
+      if (attr_def_result) {
+        // Create a new attribute definition
+        DbcFile::AttributeDef attr_def;
+        attr_def.name = attr_def_result->name;
+        
+        // Map the object type
+        switch (attr_def_result->object_type) {
+          case AttributeObjectType::NETWORK:
+            attr_def.type = AttributeObjectType::NETWORK;
+            break;
+          case AttributeObjectType::NODE:
+            attr_def.type = AttributeObjectType::NODE;
+            break;
+          case AttributeObjectType::MESSAGE:
+            attr_def.type = AttributeObjectType::MESSAGE;
+            break;
+          case AttributeObjectType::SIGNAL:
+            attr_def.type = AttributeObjectType::SIGNAL;
+            break;
+          case AttributeObjectType::ENV_VAR:
+            attr_def.type = AttributeObjectType::ENV_VAR;
+            break;
+          default:
+            attr_def.type = AttributeObjectType::NETWORK;  // Default to network
+            break;
+        }
+        
+        // Map the value type
+        switch (attr_def_result->value_type) {
+          case AttributeValueType::INT:
+          case AttributeValueType::HEX:
+            attr_def.value_type = AttributeValueType::INT;
+            break;
+          case AttributeValueType::FLOAT:
+            attr_def.value_type = AttributeValueType::FLOAT;
+            break;
+          case AttributeValueType::STRING:
+            attr_def.value_type = AttributeValueType::STRING;
+            break;
+          case AttributeValueType::ENUM:
+            attr_def.value_type = AttributeValueType::ENUM;
+            break;
+          default:
+            attr_def.value_type = AttributeValueType::STRING;  // Default to string
+            break;
+        }
+        
+        // Copy enum values if present
+        attr_def.enum_values = attr_def_result->enum_values;
+        
+        // Set min/max values if present
+        if (attr_def_result->min_value.has_value()) {
+          attr_def.min = attr_def_result->min_value.value();
+        }
+        
+        if (attr_def_result->max_value.has_value()) {
+          attr_def.max = attr_def_result->max_value.value();
+        }
+        
+        // Add the attribute definition to the list
+        state.dbc_file.attribute_definitions.push_back(attr_def);
+        state.found_valid_section = true;
+      }
+    }
+  }
+};
+
+// Actions for BA_DEF_DEF_ section (attribute definition default)
+template<>
+struct action<grammar::attr_def_def_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    std::cout << "Setting attribute definition default content: '" << in.string() << "'" << std::endl;
+    state.set_attr_def_def_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::attr_def_def_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.attr_def_def_content.empty()) {
+      std::cout << "Original attribute definition default content: '" << state.attr_def_def_content << "'" << std::endl;
+      
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.attr_def_def_content);
+      std::cout << "Cleaned attribute definition default content: '" << content << "'" << std::endl;
+      
+      auto attr_def_def_result = AttributeDefinitionDefaultParser::Parse(content);
+      if (attr_def_def_result) {
+        std::cout << "Successfully parsed attribute definition default: " << attr_def_def_result->name << std::endl;
+        
+        // Extract the default value based on its type
+        std::string default_value_str;
+        
+        // Convert the variant to a string representation
+        if (std::holds_alternative<int>(attr_def_def_result->default_value)) {
+          default_value_str = std::to_string(std::get<int>(attr_def_def_result->default_value));
+        } else if (std::holds_alternative<double>(attr_def_def_result->default_value)) {
+          default_value_str = std::to_string(std::get<double>(attr_def_def_result->default_value));
+        } else if (std::holds_alternative<std::string>(attr_def_def_result->default_value)) {
+          default_value_str = std::get<std::string>(attr_def_def_result->default_value);
+        }
+        
+        std::cout << "Setting default value: " << attr_def_def_result->name << " = " << default_value_str << std::endl;
+        
+        // Add the attribute default to the map
+        state.dbc_file.attribute_defaults[attr_def_def_result->name] = default_value_str;
+        state.found_valid_section = true;
+      } else {
+        std::cout << "Failed to parse attribute definition default" << std::endl;
+      }
+    } else {
+      std::cout << "Empty attribute definition default content" << std::endl;
+    }
+  }
+};
+
 // Actions for CM_ section
 template<>
 struct action<grammar::comment_line> {
@@ -845,19 +1001,19 @@ struct action<grammar::comment_section> {
         
         // Set the comment type and associated object based on the comment type
         if (comment_result->type == CommentType::NETWORK) {
-          comment_def.type = DbcFile::CommentDef::Type::Network;
+          comment_def.type = CommentType::NETWORK;
         } else if (comment_result->type == CommentType::NODE) {
-          comment_def.type = DbcFile::CommentDef::Type::Node;
+          comment_def.type = CommentType::NODE;
           if (std::holds_alternative<std::string>(comment_result->identifier)) {
             comment_def.object_name = std::get<std::string>(comment_result->identifier);
           }
         } else if (comment_result->type == CommentType::MESSAGE) {
-          comment_def.type = DbcFile::CommentDef::Type::Message;
+          comment_def.type = CommentType::MESSAGE;
           if (std::holds_alternative<int>(comment_result->identifier)) {
             comment_def.object_id = std::get<int>(comment_result->identifier);
           }
         } else if (comment_result->type == CommentType::SIGNAL) {
-          comment_def.type = DbcFile::CommentDef::Type::Signal;
+          comment_def.type = CommentType::SIGNAL;
           if (std::holds_alternative<std::pair<int, std::string>>(comment_result->identifier)) {
             const auto& id_pair = std::get<std::pair<int, std::string>>(comment_result->identifier);
             comment_def.object_id = id_pair.first;
@@ -865,7 +1021,7 @@ struct action<grammar::comment_section> {
             comment_def.object_name = id_pair.second;  // Store signal name in object_name
           }
         } else if (comment_result->type == CommentType::ENV_VAR) {
-          comment_def.type = DbcFile::CommentDef::Type::EnvVar;
+          comment_def.type = CommentType::ENV_VAR;
           if (std::holds_alternative<std::string>(comment_result->identifier)) {
             comment_def.object_name = std::get<std::string>(comment_result->identifier);
           }
@@ -1043,6 +1199,59 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
             state.found_valid_section = true;
           }
         }
+        
+        // Special handling for attribute definition defaults which may not be matched by our grammar
+        if (line.find("BA_DEF_DEF_") != std::string::npos) {
+          std::cout << "Direct processing of BA_DEF_DEF_ line: " << line << std::endl;
+          
+          // Try to parse using the dedicated parser
+          auto attr_def_def_result = AttributeDefinitionDefaultParser::Parse(line);
+          if (attr_def_def_result) {
+            std::cout << "Successfully parsed standalone attribute default: " << attr_def_def_result->name << std::endl;
+            
+            // Extract the default value based on its type
+            std::string default_value_str;
+            
+            // Convert the variant to a string representation
+            if (std::holds_alternative<int>(attr_def_def_result->default_value)) {
+              default_value_str = std::to_string(std::get<int>(attr_def_def_result->default_value));
+            } else if (std::holds_alternative<double>(attr_def_def_result->default_value)) {
+              default_value_str = std::to_string(std::get<double>(attr_def_def_result->default_value));
+            } else if (std::holds_alternative<std::string>(attr_def_def_result->default_value)) {
+              default_value_str = std::get<std::string>(attr_def_def_result->default_value);
+            }
+            
+            std::cout << "Setting direct standalone default value: " << attr_def_def_result->name << " = " << default_value_str << std::endl;
+            
+            // Add the attribute default to the map
+            state.dbc_file.attribute_defaults[attr_def_def_result->name] = default_value_str;
+            state.found_valid_section = true;
+          }
+        }
+
+        // Direct processing of node definitions (BU_)
+        if (line.find("BU_:") != std::string::npos || line.find("BU_: ") != std::string::npos) {
+          std::cout << "Direct processing of node line: " << line << std::endl;
+          
+          // Try to parse using the dedicated parser
+          auto nodes_result = NodesParser::Parse(line);
+          if (nodes_result) {
+            std::cout << "Successfully parsed nodes line with " << nodes_result->size() << " nodes" << std::endl;
+            
+            // Clear any existing nodes to avoid duplication
+            state.dbc_file.nodes.clear();
+            
+            // Add all nodes to the result
+            for (const auto& node : *nodes_result) {
+              std::cout << "  Adding node: " << node.name << std::endl;
+              state.dbc_file.nodes.push_back(node.name);
+            }
+            
+            state.found_valid_section = true;
+          } else {
+            std::cout << "Failed to parse BU_ line directly" << std::endl;
+          }
+        }
       }
       
       // Return result if we found at least one valid section
@@ -1098,6 +1307,63 @@ struct action<grammar::env_var_section> {
       }
     } else {
       std::cout << "Empty environment variable content" << std::endl;
+    }
+  }
+};
+
+// Debug function to print a line from the parser
+template<>
+struct action<grammar::any_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    std::string line = in.string();
+    if (line.find("BA_DEF_DEF_") != std::string::npos) {
+      std::cout << "any_line: [" << line << "]" << std::endl;
+      
+      // Detailed grammar rule debug
+      bool starts_with_ws = std::regex_match(line, std::regex("^\\s+.*"));
+      bool has_semicolon = line.find(';') != std::string::npos;
+      bool ends_with_eol = line.find('\n') != std::string::npos || line.find('\r') != std::string::npos;
+      
+      std::cout << "Grammar debug - starts_with_ws: " << starts_with_ws 
+                << ", has_semicolon: " << has_semicolon 
+                << ", ends_with_eol: " << ends_with_eol << std::endl;
+    }
+  }
+};
+
+// Action for direct attribute definition default line
+template<>
+struct action<grammar::direct_attr_def_def_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    std::string line = in.string();
+    std::cout << "direct_attr_def_def_line matched: [" << line << "]" << std::endl;
+    
+    // Try to parse using the dedicated parser
+    auto attr_def_def_result = AttributeDefinitionDefaultParser::Parse(line);
+    if (attr_def_def_result) {
+      std::cout << "Successfully parsed direct attribute default: " << attr_def_def_result->name << std::endl;
+      
+      // Extract the default value based on its type
+      std::string default_value_str;
+      
+      // Convert the variant to a string representation
+      if (std::holds_alternative<int>(attr_def_def_result->default_value)) {
+        default_value_str = std::to_string(std::get<int>(attr_def_def_result->default_value));
+      } else if (std::holds_alternative<double>(attr_def_def_result->default_value)) {
+        default_value_str = std::to_string(std::get<double>(attr_def_def_result->default_value));
+      } else if (std::holds_alternative<std::string>(attr_def_def_result->default_value)) {
+        default_value_str = std::get<std::string>(attr_def_def_result->default_value);
+      }
+      
+      std::cout << "Setting direct default value: " << attr_def_def_result->name << " = " << default_value_str << std::endl;
+      
+      // Add the attribute default to the map
+      state.dbc_file.attribute_defaults[attr_def_def_result->name] = default_value_str;
+      state.found_valid_section = true;
+    } else {
+      std::cout << "Failed to parse direct attribute definition default" << std::endl;
     }
   }
 };
