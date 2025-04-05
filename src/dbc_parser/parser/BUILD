@@ -121,6 +121,8 @@ cc_library(
     srcs = ["signal_type_def_parser.cc"],
     hdrs = ["signal_type_def_parser.h"],
     deps = [
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -131,6 +133,8 @@ cc_library(
     srcs = ["signal_value_type_parser.cc"],
     hdrs = ["signal_value_type_parser.h"],
     deps = [
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

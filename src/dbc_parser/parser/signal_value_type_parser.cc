@@ -6,6 +6,7 @@
 
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/parse_tree.hpp"
+#include "src/dbc_parser/parser/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -15,32 +16,17 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for SIG_VALTYPE_ (Signal Value Type) parsing
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using semicolon = common_grammar::semicolon;
+using identifier = common_grammar::identifier;
+using message_id = common_grammar::message_id;
 
 // SIG_VALTYPE_ keyword
 struct sig_valtype_keyword : pegtl::string<'S', 'I', 'G', '_', 'V', 'A', 'L', 'T', 'Y', 'P', 'E', '_'> {};
 
-// Message ID (integer, possibly with a negative sign)
-struct message_id : pegtl::seq<
-                      pegtl::opt<pegtl::one<'-'>>,
-                      pegtl::plus<pegtl::digit>
-                    > {};
-
-// Signal name (identifier)
-struct identifier : pegtl::plus<
-                      pegtl::sor<
-                        pegtl::alpha,
-                        pegtl::one<'_'>,
-                        pegtl::digit
-                      >
-                    > {};
-
 // Signal type (integer)
 struct signal_type : pegtl::plus<pegtl::digit> {};
-
-// Semicolon
-struct semicolon : pegtl::one<';'> {};
 
 // Complete SIG_VALTYPE_ rule
 struct sig_valtype_rule : pegtl::seq<
@@ -112,13 +98,18 @@ struct signal_value_type_action<grammar::signal_type> {
 };
 
 std::optional<SignalValueType> SignalValueTypeParser::Parse(std::string_view input) {
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "SIG_VALTYPE_");
+  // Validate input using ParserBase method
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
   
   // Create state to collect results
   signal_value_type_state state;
   
   try {
+    // Create input for PEGTL parser using base class method
+    pegtl::memory_input<> in = CreateInput(input, "SIG_VALTYPE_");
+    
     // Parse input using our grammar and actions
     if (!pegtl::parse<grammar::sig_valtype_rule, signal_value_type_action>(in, state)) {
       return std::nullopt;

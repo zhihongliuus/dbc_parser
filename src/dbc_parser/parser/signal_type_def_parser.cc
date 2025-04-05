@@ -7,6 +7,7 @@
 
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/parse_tree.hpp"
+#include "src/dbc_parser/parser/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -16,29 +17,27 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for SIG_TYPE_DEF_ (Signal Type Definition) parsing
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using semicolon = common_grammar::semicolon;
+using comma = common_grammar::comma;
+using colon = common_grammar::colon;
+using identifier = common_grammar::identifier;
+using integer = common_grammar::integer;
+using floating_point = common_grammar::floating_point;
+using quoted_string = common_grammar::quoted_string;
 
 // SIG_TYPE_DEF_ keyword
 struct sig_type_def_keyword : pegtl::string<'S', 'I', 'G', '_', 'T', 'Y', 'P', 'E', '_', 'D', 'E', 'F', '_'> {};
 
-// Name (identifier)
-struct identifier : pegtl::plus<
-                     pegtl::sor<
-                       pegtl::alpha,
-                       pegtl::one<'_'>,
-                       pegtl::digit,
-                       pegtl::one<'-'>
-                     >
-                   > {};
+// Value type ('+' for unsigned, '-' for signed, etc.)
+struct value_type : pegtl::plus<pegtl::not_one<' ', '\t', ',', ';'>> {};
 
-// Integer value
-struct integer : pegtl::seq<
-                   pegtl::opt<pegtl::one<'-'>>,
-                   pegtl::plus<pegtl::digit>
-                 > {};
+struct unquoted_string : pegtl::plus<pegtl::not_one<' ', '\t', ',', ';'>> {};
 
-// Floating-point number
+struct unit_string : pegtl::sor<quoted_string, unquoted_string> {};
+
+// Decimal value (for factor, offset, min, max, default)
 struct decimal : pegtl::seq<
                    pegtl::opt<pegtl::one<'-'>>,
                    pegtl::plus<pegtl::digit>,
@@ -49,29 +48,6 @@ struct decimal : pegtl::seq<
                      >
                    >
                  > {};
-
-// Value type ('+' for unsigned, '-' for signed, etc.)
-struct value_type : pegtl::plus<pegtl::not_one<' ', '\t', ',', ';'>> {};
-
-// Unit string (may be quoted)
-struct quoted_string : pegtl::seq<
-                         pegtl::one<'"'>,
-                         pegtl::star<pegtl::not_one<'"'>>,
-                         pegtl::one<'"'>
-                       > {};
-
-struct unquoted_string : pegtl::plus<pegtl::not_one<' ', '\t', ',', ';'>> {};
-
-struct unit_string : pegtl::sor<quoted_string, unquoted_string> {};
-
-// Colon
-struct colon : pegtl::one<':'> {};
-
-// Comma
-struct comma : pegtl::one<','> {};
-
-// Semicolon
-struct semicolon : pegtl::one<';'> {};
 
 // Optional whitespace and comma
 struct opt_ws_comma : pegtl::seq<ws, comma, ws> {};
@@ -219,9 +195,8 @@ struct signal_type_def_action<grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, signal_type_def_state& state) {
     if (!state.unit_set) {
-      // Remove quotes
-      std::string quoted = in.string();
-      state.unit = quoted.substr(1, quoted.length() - 2);
+      // Use ParserBase method to unescape the string
+      state.unit = ParserBase::UnescapeString(in.string());
       state.unit_set = true;
     }
   }
@@ -241,13 +216,18 @@ struct signal_type_def_action<grammar::unquoted_string> {
 };
 
 std::optional<SignalTypeDef> SignalTypeDefParser::Parse(std::string_view input) {
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "SIG_TYPE_DEF_");
+  // Validate input using ParserBase method
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
   
   // Create state to collect results
   signal_type_def_state state;
   
   try {
+    // Create input for PEGTL parser using base class method
+    pegtl::memory_input<> in = CreateInput(input, "SIG_TYPE_DEF_");
+    
     // Parse input using our grammar and actions
     if (!pegtl::parse<grammar::sig_type_def_rule, signal_type_def_action>(in, state)) {
       return std::nullopt;

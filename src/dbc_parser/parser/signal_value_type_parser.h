@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include "src/dbc_parser/parser/parser_base.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -21,7 +23,7 @@ struct SignalValueType {
 };
 
 // Parser for the Signal Value Type (SIG_VALTYPE_) section of a DBC file
-class SignalValueTypeParser {
+class SignalValueTypeParser : public ParserBase {
  public:
   // Parses a signal value type section from the given input
   // Returns std::nullopt if parsing fails
