@@ -7,6 +7,8 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/parse_tree.hpp"
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -14,18 +16,14 @@ namespace pegtl = tao::pegtl;
 
 // Grammar rules for BS_ (Bit Timing) parsing
 namespace grammar {
-
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
-
-// BS_ keyword
-struct bs_keyword : pegtl::string<'B', 'S', '_'> {};
-
-// Colon separator
-struct colon : pegtl::one<':'> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using bs_keyword = common_grammar::bs_keyword;
+using colon = common_grammar::colon;
+using digits = common_grammar::digits;
 
 // Integer (for baudrate)
-struct integer : pegtl::plus<pegtl::digit> {};
+struct integer : digits {};
 
 // Floating point number (for BTR1/BTR2)
 struct decimal : pegtl::seq<pegtl::opt<pegtl::one<'-'>>, 
@@ -90,8 +88,13 @@ struct bit_timing_action<grammar::decimal> {
 };
 
 std::optional<BitTiming> BitTimingParser::Parse(std::string_view input) {
+  // Validate input
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
+  
   // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "BS_");
+  pegtl::memory_input<> in = CreateInput(input, "BS_");
   
   // Create state to collect results
   bit_timing_state state;

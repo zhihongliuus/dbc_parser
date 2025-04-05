@@ -6,12 +6,13 @@
 #include <string_view>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
 
 // Parser for bit timing (BS_) in DBC files
-class BitTimingParser {
+class BitTimingParser : public ParserBase {
  public:
   // Parses a bit timing section from the given input and returns a BitTiming object
   // Returns std::nullopt if parsing fails

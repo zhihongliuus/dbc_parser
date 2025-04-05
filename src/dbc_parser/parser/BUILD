@@ -28,8 +28,9 @@ cc_library(
     srcs = ["bit_timing_parser.cc"],
     hdrs = ["bit_timing_parser.h"],
     deps = [
+        ":common_grammar",
         ":common_types",
-        "//src/dbc_parser/core:string_utils",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -153,6 +154,8 @@ cc_library(
     hdrs = ["comment_parser.h"],
     deps = [
         ":common_types",
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

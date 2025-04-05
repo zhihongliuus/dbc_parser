@@ -46,6 +46,9 @@ struct floating_point : pegtl::seq<
                            pegtl::opt<digits>
                          > {};
 
+// Message ID used in various places (can be signed)
+struct message_id : pegtl::seq<sign, digits> {};
+
 // Common identifiers
 struct identifier : pegtl::identifier {};
 

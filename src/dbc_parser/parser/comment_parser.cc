@@ -11,6 +11,8 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/parse_tree.hpp>
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -19,11 +21,7 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for parsing comments in DBC files
 namespace grammar {
 
-// Whitespace handling
-struct ws : pegtl::star<pegtl::space> {};
-struct required_ws : pegtl::plus<pegtl::space> {};
-
-// Keyword for comments
+// Keywords for comments
 struct cm_prefix : pegtl::string<'C', 'M', '_'> {};
 
 // Object type indicators
@@ -32,71 +30,44 @@ struct bo_type : pegtl::string<'B', 'O', '_'> {};
 struct sg_type : pegtl::string<'S', 'G', '_'> {};
 struct ev_type : pegtl::string<'E', 'V', '_'> {};
 
-// Message ID - can be signed
-struct sign : pegtl::opt<pegtl::one<'-'>> {};
-struct digits : pegtl::plus<pegtl::digit> {};
-struct message_id : pegtl::seq<sign, digits> {};
-
-// String with quotes and escape sequences
-struct escaped_char : pegtl::seq<pegtl::one<'\\'>, pegtl::any> {};
-struct unescaped_char : pegtl::not_one<'"', '\\'> {};
-struct string_content : pegtl::star<pegtl::sor<escaped_char, unescaped_char>> {};
-struct quoted_string : pegtl::seq<
-    pegtl::one<'"'>,
-    string_content,
-    pegtl::one<'"'>
-> {};
-
-// Identifiers - separate rules for quoted and unquoted
-struct unquoted_identifier : pegtl::identifier {};
-struct quoted_identifier : quoted_string {};
-
-// Node, signal, and environment variable names can be either quoted or unquoted
-struct node_name : pegtl::sor<quoted_identifier, unquoted_identifier> {};
-struct env_var_name : pegtl::sor<quoted_identifier, unquoted_identifier> {};
-struct signal_name : pegtl::sor<quoted_identifier, unquoted_identifier> {};
-
-// Semicolon
-struct semicolon : pegtl::one<';'> {};
-
 // Different comment types
 struct network_comment : pegtl::seq<
-    cm_prefix, ws,
-    quoted_string, ws,
-    semicolon
+    cm_prefix, common_grammar::ws,
+    common_grammar::quoted_string, common_grammar::ws,
+    common_grammar::semicolon
 > {};
 
 struct node_comment : pegtl::seq<
-    cm_prefix, ws,
-    bu_type, ws,
-    node_name, ws,
-    quoted_string, ws,
-    semicolon
+    cm_prefix, common_grammar::ws,
+    bu_type, common_grammar::ws,
+    pegtl::sor<common_grammar::quoted_identifier, common_grammar::unquoted_identifier>, common_grammar::ws,
+    common_grammar::quoted_string, common_grammar::ws,
+    common_grammar::semicolon
 > {};
 
 struct message_comment : pegtl::seq<
-    cm_prefix, ws,
-    bo_type, ws,
-    message_id, ws,
-    quoted_string, ws,
-    semicolon
+    cm_prefix, common_grammar::ws,
+    bo_type, common_grammar::ws,
+    common_grammar::message_id, common_grammar::ws,
+    common_grammar::quoted_string, common_grammar::ws,
+    common_grammar::semicolon
 > {};
 
 struct signal_comment : pegtl::seq<
-    cm_prefix, ws,
-    sg_type, ws,
-    message_id, ws,
-    signal_name, ws,
-    quoted_string, ws,
-    semicolon
+    cm_prefix, common_grammar::ws,
+    sg_type, common_grammar::ws,
+    common_grammar::message_id, common_grammar::ws,
+    pegtl::sor<common_grammar::quoted_identifier, common_grammar::unquoted_identifier>, common_grammar::ws,
+    common_grammar::quoted_string, common_grammar::ws,
+    common_grammar::semicolon
 > {};
 
 struct env_var_comment : pegtl::seq<
-    cm_prefix, ws,
-    ev_type, ws,
-    env_var_name, ws,
-    quoted_string, ws,
-    semicolon
+    cm_prefix, common_grammar::ws,
+    ev_type, common_grammar::ws,
+    pegtl::sor<common_grammar::quoted_identifier, common_grammar::unquoted_identifier>, common_grammar::ws,
+    common_grammar::quoted_string, common_grammar::ws,
+    common_grammar::semicolon
 > {};
 
 // The complete comment rule
@@ -121,9 +92,6 @@ struct CommentState {
   > identifier;
   std::string text;
   
-  // Tracking for quoted strings
-  bool is_first_quoted_string = true;
-  
   // Helper methods for state validation
   bool HasValidIdentifier() const {
     switch (type) {
@@ -147,40 +115,15 @@ struct CommentState {
   }
 };
 
-// Utility to unescape string content
-std::string UnescapeString(std::string_view quoted) {
-  if (quoted.size() < 2) return "";
-  
-  // Remove surrounding quotes
-  std::string_view content = quoted.substr(1, quoted.size() - 2);
-  
-  std::string result;
-  result.reserve(content.size());
-  
-  bool escaped = false;
-  for (char c : content) {
-    if (escaped) {
-      result.push_back(c);
-      escaped = false;
-    } else if (c == '\\') {
-      escaped = true;
-    } else {
-      result.push_back(c);
-    }
-  }
-  
-  return result;
-}
-
 // Actions to extract data during parsing
 template<typename Rule>
 struct action : pegtl::nothing<Rule> {};
 
 template<>
-struct action<grammar::quoted_string> {
+struct action<common_grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, CommentState& state) {
-    std::string unescaped = UnescapeString(in.string());
+    std::string unescaped = ParserBase::UnescapeString(in.string());
     
     // For all types, the quoted string is the comment text
     state.text = unescaped;
@@ -193,7 +136,6 @@ struct action<grammar::bu_type> {
   static void apply(const ActionInput&, CommentState& state) {
     state.type = CommentType::NODE;
     state.identifier = std::string{};
-    state.is_first_quoted_string = true;
   }
 };
 
@@ -203,7 +145,6 @@ struct action<grammar::bo_type> {
   static void apply(const ActionInput&, CommentState& state) {
     state.type = CommentType::MESSAGE;
     state.identifier = 0;  // Default value, will be updated by message_id action
-    state.is_first_quoted_string = true;
   }
 };
 
@@ -213,7 +154,6 @@ struct action<grammar::sg_type> {
   static void apply(const ActionInput&, CommentState& state) {
     state.type = CommentType::SIGNAL;
     state.identifier = std::make_pair(0, "");  // Default value
-    state.is_first_quoted_string = true;
   }
 };
 
@@ -223,21 +163,11 @@ struct action<grammar::ev_type> {
   static void apply(const ActionInput&, CommentState& state) {
     state.type = CommentType::ENV_VAR;
     state.identifier = std::string{};
-    state.is_first_quoted_string = true;
   }
 };
 
 template<>
-struct action<grammar::node_name> : pegtl::nothing<grammar::node_name> {};
-
-template<>
-struct action<grammar::signal_name> : pegtl::nothing<grammar::signal_name> {};
-
-template<>
-struct action<grammar::env_var_name> : pegtl::nothing<grammar::env_var_name> {};
-
-template<>
-struct action<grammar::message_id> {
+struct action<common_grammar::message_id> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, CommentState& state) {
     try {
@@ -257,10 +187,10 @@ struct action<grammar::message_id> {
 };
 
 template<>
-struct action<grammar::quoted_identifier> {
+struct action<common_grammar::quoted_identifier> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, CommentState& state) {
-    std::string unescaped = UnescapeString(in.string());
+    std::string unescaped = ParserBase::UnescapeString(in.string());
     
     // Store the unquoted string based on the comment type
     if (state.type == CommentType::NODE) {
@@ -276,7 +206,7 @@ struct action<grammar::quoted_identifier> {
 };
 
 template<>
-struct action<grammar::unquoted_identifier> {
+struct action<common_grammar::unquoted_identifier> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, CommentState& state) {
     // Store the identifier string directly based on the comment type
@@ -294,12 +224,12 @@ struct action<grammar::unquoted_identifier> {
 
 std::optional<Comment> CommentParser::Parse(std::string_view input) {
   // Validate input
-  if (input.empty() || input.back() != ';') {
+  if (!ValidateInput(input) || input.back() != ';') {
     return std::nullopt;
   }
 
   CommentState state;
-  pegtl::memory_input<> in(input.data(), input.size(), "comment");
+  pegtl::memory_input<> in = CreateInput(input, "comment");
   
   try {
     if (!pegtl::parse<grammar::comment_rule, action>(in, state)) {

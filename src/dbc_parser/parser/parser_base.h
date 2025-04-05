@@ -15,6 +15,37 @@ namespace pegtl = tao::pegtl;
  * Base class for parsers with common functionality
  */
 class ParserBase {
+ public:
+  /**
+   * Utility to unescape quoted string content
+   * 
+   * @param quoted The quoted string to unescape
+   * @return The unescaped string content without quotes
+   */
+  static std::string UnescapeString(std::string_view quoted) {
+    if (quoted.size() < 2) return "";
+    
+    // Remove surrounding quotes
+    std::string_view content = quoted.substr(1, quoted.size() - 2);
+    
+    std::string result;
+    result.reserve(content.size());
+    
+    bool escaped = false;
+    for (char c : content) {
+      if (escaped) {
+        result.push_back(c);
+        escaped = false;
+      } else if (c == '\\') {
+        escaped = true;
+      } else {
+        result.push_back(c);
+      }
+    }
+    
+    return result;
+  }
+
  protected:
   /**
    * Constructor is protected since this is a base class
