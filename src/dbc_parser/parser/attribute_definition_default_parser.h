@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "src/dbc_parser/parser/attribute_definition_parser.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -21,7 +22,7 @@ struct AttributeDefinitionDefault {
 };
 
 // Parser for BA_DEF_DEF_ entries in DBC files
-class AttributeDefinitionDefaultParser {
+class AttributeDefinitionDefaultParser : public ParserBase {
  public:
   // Parses an attribute definition default string and returns an AttributeDefinitionDefault object if parsing is successful
   // Returns std::nullopt if parsing fails

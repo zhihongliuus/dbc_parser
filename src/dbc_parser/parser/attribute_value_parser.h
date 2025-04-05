@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "src/dbc_parser/parser/attribute_definition_parser.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -29,7 +30,7 @@ struct AttributeValue {
 };
 
 // Parser for BA_ entries in DBC files
-class AttributeValueParser {
+class AttributeValueParser : public ParserBase {
  public:
   // Parses an attribute value string and returns an AttributeValue object if parsing is successful
   // Returns std::nullopt if parsing fails

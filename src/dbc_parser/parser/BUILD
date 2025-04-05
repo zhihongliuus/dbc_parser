@@ -197,6 +197,8 @@ cc_library(
     hdrs = ["attribute_definition_parser.h"],
     deps = [
         ":common_types",
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -208,6 +210,8 @@ cc_library(
     hdrs = ["attribute_definition_default_parser.h"],
     deps = [
         ":attribute_definition_parser",
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -220,6 +224,8 @@ cc_library(
     deps = [
         ":attribute_definition_parser",
         ":common_types",
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

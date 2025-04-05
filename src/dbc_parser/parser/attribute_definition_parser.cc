@@ -9,6 +9,7 @@
 
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
+#include "src/dbc_parser/parser/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -18,17 +19,22 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for attribute definition parsing (BA_DEF_)
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using semicolon = common_grammar::semicolon;
+using quoted_string = common_grammar::quoted_string;
+using comma = common_grammar::comma;
+using integer = common_grammar::integer;
+using floating_point = common_grammar::floating_point;
 
 // BA_DEF_ keyword
 struct ba_def_keyword : pegtl::string<'B', 'A', '_', 'D', 'E', 'F', '_'> {};
 
 // Object type identifiers
-struct bo_keyword : pegtl::string<'B', 'O', '_'> {};
-struct sg_keyword : pegtl::string<'S', 'G', '_'> {};
-struct bu_keyword : pegtl::string<'B', 'U', '_'> {};
-struct ev_keyword : pegtl::string<'E', 'V', '_'> {};
+using bo_keyword = common_grammar::bo_keyword;
+using sg_keyword = common_grammar::sg_keyword;
+using bu_keyword = common_grammar::bu_keyword;
+using ev_keyword = common_grammar::ev_keyword;
 
 // Object type
 struct object_type : pegtl::sor<
@@ -53,40 +59,8 @@ struct value_type : pegtl::sor<
                       enum_keyword
                     > {};
 
-// Rules for quoted strings with escaping
-struct escaped_char : pegtl::seq<pegtl::one<'\\'>, pegtl::any> {};
-struct regular_char : pegtl::not_one<'"', '\\'> {};
-struct string_content : pegtl::star<pegtl::sor<escaped_char, regular_char>> {};
-struct quoted_string : pegtl::seq<pegtl::one<'"'>, string_content, pegtl::one<'"'>> {};
-
-// Comma for separating enum values
-struct comma : pegtl::one<','> {};
-
-// Rules for numeric values
-struct decimal_digit : pegtl::range<'0', '9'> {};
-struct sign : pegtl::one<'+', '-'> {};
-struct dot : pegtl::one<'.'> {};
-
-struct integer : pegtl::seq<
-                   pegtl::opt<sign>,
-                   pegtl::plus<decimal_digit>
-                 > {};
-
-struct floating_point : pegtl::seq<
-                          pegtl::opt<sign>,
-                          pegtl::plus<decimal_digit>,
-                          pegtl::opt<
-                            pegtl::seq<
-                              dot,
-                              pegtl::star<decimal_digit>
-                            >
-                          >
-                        > {};
-
+// Numeric value (integer or floating point)
 struct numeric_value : pegtl::sor<floating_point, integer> {};
-
-// Semicolon at the end
-struct semicolon : pegtl::one<';'> {};
 
 // Enum values list
 struct enum_values : pegtl::list<quoted_string, comma> {};
@@ -185,30 +159,18 @@ struct action<grammar::network_attr_def> {
   }
 };
 
-// Extract attribute name
+// Extract attribute name from a quoted string
 template<>
-struct action<grammar::string_content> {
+struct action<grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, attribute_definition_state& state) {
-    // If this is the first string_content we've seen and the name is empty, it's the attribute name
+    std::string quoted = in.string();
+    // If this is the first quoted string we've seen and the name is empty, it's the attribute name
     if (state.attribute_definition.name.empty()) {
-      state.attribute_definition.name = in.string();
+      state.attribute_definition.name = ParserBase::UnescapeString(quoted);
     } else if (state.is_enum) {
       // This is an enum value
-      std::string enum_value = in.string();
-      
-      // Unescape any escaped characters
-      std::string unescaped;
-      for (size_t i = 0; i < enum_value.length(); ++i) {
-        if (enum_value[i] == '\\' && i + 1 < enum_value.length()) {
-          // Skip backslash and add the escaped character
-          unescaped += enum_value[++i];
-        } else {
-          unescaped += enum_value[i];
-        }
-      }
-      
-      state.attribute_definition.enum_values.push_back(unescaped);
+      state.attribute_definition.enum_values.push_back(ParserBase::UnescapeString(quoted));
     }
   }
 };
@@ -291,17 +253,18 @@ struct action<grammar::numeric_value> {
 };
 
 std::optional<AttributeDefinition> AttributeDefinitionParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Validate input using ParserBase method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
-
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "BA_DEF_");
   
   // Create state to collect results
   attribute_definition_state state;
   
   try {
+    // Create input for PEGTL parser using base class method
+    pegtl::memory_input<> in = CreateInput(input, "BA_DEF_");
+    
     // Parse input using our grammar and actions
     if (pegtl::parse<grammar::ba_def_rule, action>(in, state)) {
       // Set a default value placeholder (it will be set by BA_DEF_DEF_ later)

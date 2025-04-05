@@ -9,6 +9,7 @@
 #include <variant>
 
 #include "tao/pegtl.hpp"
+#include "src/dbc_parser/parser/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -18,66 +19,36 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for attribute value parsing (BA_)
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using semicolon = common_grammar::semicolon;
+using quoted_string = common_grammar::quoted_string;
+using integer = common_grammar::integer;
+using floating_point = common_grammar::floating_point;
+using digit = common_grammar::digit;
+
+// Use common keywords
+using bo_keyword = common_grammar::bo_keyword;
+using sg_keyword = common_grammar::sg_keyword;
+using bu_keyword = common_grammar::bu_keyword;
+using ev_keyword = common_grammar::ev_keyword;
 
 // BA_ keyword
 struct ba_keyword : pegtl::string<'B', 'A', '_'> {};
 
-// Object type identifiers
-struct bo_keyword : pegtl::string<'B', 'O', '_'> {};
-struct sg_keyword : pegtl::string<'S', 'G', '_'> {};
-struct bu_keyword : pegtl::string<'B', 'U', '_'> {};
-struct ev_keyword : pegtl::string<'E', 'V', '_'> {};
-
-// Rules for quoted strings with escaping
-struct escaped_char : pegtl::seq<pegtl::one<'\\'>, pegtl::any> {};
-struct regular_char : pegtl::not_one<'"', '\\'> {};
-struct string_content : pegtl::star<pegtl::sor<escaped_char, regular_char>> {};
-struct quoted_string : pegtl::seq<pegtl::one<'"'>, string_content, pegtl::one<'"'>> {};
-
-// Node name
-struct node_name : quoted_string {};
-
-// Signal name
-struct signal_name : quoted_string {};
-
-// Environment variable name
-struct env_var_name : quoted_string {};
-
-// Attribute name
-struct attr_name : quoted_string {};
-
-// Rules for numeric values
-struct sign : pegtl::one<'+', '-'> {};
-struct dot : pegtl::one<'.'> {};
-struct digit : pegtl::digit {};
-
-struct integer : pegtl::seq<
-                   pegtl::opt<sign>,
-                   pegtl::plus<digit>
-                 > {};
-
-struct floating_point : pegtl::seq<
-                          pegtl::opt<sign>,
-                          pegtl::plus<digit>,
-                          dot,
-                          pegtl::star<digit>
-                        > {};
-
-struct numeric_value : pegtl::sor<floating_point, integer> {};
-
-// String value
-struct string_value : quoted_string {};
+// Node name, signal name, env var name, and attribute name
+struct node_name : common_grammar::quoted_string {};
+struct signal_name : common_grammar::quoted_string {};
+struct env_var_name : common_grammar::quoted_string {};
+struct attr_name : common_grammar::quoted_string {};
 
 // Message ID
 struct message_id : pegtl::plus<digit> {};
 
 // Attribute value
+struct numeric_value : pegtl::sor<floating_point, integer> {};
+struct string_value : common_grammar::quoted_string {};
 struct attr_value : pegtl::sor<string_value, numeric_value> {};
-
-// Semicolon at the end
-struct semicolon : pegtl::one<';'> {};
 
 // Network level attribute (no object type)
 struct network_attr : pegtl::seq<
@@ -163,19 +134,6 @@ struct grammar : pegtl::sor<
 
 } // namespace grammar
 
-// Helper function to unescape string content
-std::string UnescapeString(const std::string& content) {
-  std::string unescaped;
-  for (size_t i = 0; i < content.length(); ++i) {
-    if (content[i] == '\\' && i + 1 < content.length()) {
-      unescaped += content[++i];
-    } else {
-      unescaped += content[i];
-    }
-  }
-  return unescaped;
-}
-
 // Structure to hold state during parsing
 struct attribute_value_state {
   AttributeValue attr_value;
@@ -199,22 +157,12 @@ struct attribute_value_state {
 template<typename Rule>
 struct action : pegtl::nothing<Rule> {};
 
-// Handle quoted string content
-template<>
-struct action<grammar::string_content> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, attribute_value_state& state) {
-    std::string content = UnescapeString(in.string());
-    state.string_value = content;
-  }
-};
-
 // Extract attribute name
 template<>
 struct action<grammar::attr_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.attr_name = state.string_value;
+  static void apply(const ActionInput& in, attribute_value_state& state) {
+    state.attr_name = ParserBase::UnescapeString(in.string());
     state.attr_value.name = state.attr_name;
   }
 };
@@ -223,8 +171,8 @@ struct action<grammar::attr_name> {
 template<>
 struct action<grammar::node_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.node_name = state.string_value;
+  static void apply(const ActionInput& in, attribute_value_state& state) {
+    state.node_name = ParserBase::UnescapeString(in.string());
   }
 };
 
@@ -232,8 +180,8 @@ struct action<grammar::node_name> {
 template<>
 struct action<grammar::signal_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.signal_name = state.string_value;
+  static void apply(const ActionInput& in, attribute_value_state& state) {
+    state.signal_name = ParserBase::UnescapeString(in.string());
   }
 };
 
@@ -241,8 +189,8 @@ struct action<grammar::signal_name> {
 template<>
 struct action<grammar::env_var_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.env_var_name = state.string_value;
+  static void apply(const ActionInput& in, attribute_value_state& state) {
+    state.env_var_name = ParserBase::UnescapeString(in.string());
   }
 };
 
@@ -250,9 +198,9 @@ struct action<grammar::env_var_name> {
 template<>
 struct action<grammar::string_value> {
   template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
+  static void apply(const ActionInput& in, attribute_value_state& state) {
     state.has_string_value = true;
-    state.attr_value.value = state.string_value;
+    state.attr_value.value = ParserBase::UnescapeString(in.string());
   }
 };
 
@@ -346,17 +294,18 @@ struct action<grammar::floating_point> {
 };
 
 std::optional<AttributeValue> AttributeValueParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Validate input using ParserBase method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
-
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "BA_");
   
   // Create state to collect results
   attribute_value_state state;
   
   try {
+    // Create input for PEGTL parser using base class method
+    pegtl::memory_input<> in = CreateInput(input, "BA_");
+    
     // Parse input using our grammar and actions
     if (pegtl::parse<grammar::grammar, action>(in, state)) {
       return state.attr_value;
