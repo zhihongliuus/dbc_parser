@@ -8,6 +8,7 @@
 #include <variant>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -29,7 +30,7 @@ struct ValueDescription {
 };
 
 // Parser for VAL_ entries in DBC files
-class ValueDescriptionParser {
+class ValueDescriptionParser : public ParserBase {
  public:
   // Parses a value description string and returns a ValueDescription object if parsing is successful
   // Returns std::nullopt if parsing fails

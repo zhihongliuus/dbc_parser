@@ -184,6 +184,8 @@ cc_library(
     hdrs = ["value_description_parser.h"],
     deps = [
         ":common_types",
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

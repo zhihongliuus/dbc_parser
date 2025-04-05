@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "tao/pegtl.hpp"
+#include "src/dbc_parser/parser/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -17,28 +18,19 @@ namespace pegtl = tao::pegtl;
 
 namespace grammar {
 
-// Basic grammar components
-struct ws : pegtl::plus<pegtl::space> {};
-struct optional_ws : pegtl::star<pegtl::space> {};
-struct semicolon : pegtl::one<';'> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using optional_ws = common_grammar::opt_ws;
+using semicolon = common_grammar::semicolon;
+using message_id = common_grammar::message_id;
+using identifier = common_grammar::identifier;
+using quoted_string = common_grammar::quoted_string;
 
 // Keywords
 struct val_keyword : pegtl::string<'V', 'A', 'L', '_'> {};
 
-// Identifiers and values
-struct identifier : pegtl::seq<
-  pegtl::alpha,
-  pegtl::star<pegtl::sor<pegtl::alpha, pegtl::digit, pegtl::one<'_'>>>
-> {};
-
-struct message_id : pegtl::seq<pegtl::opt<pegtl::one<'-'>>, pegtl::plus<pegtl::digit>> {};
+// Values
 struct integer_value : pegtl::seq<pegtl::opt<pegtl::one<'-'>>, pegtl::plus<pegtl::digit>> {};
-
-// String parsing for quoted strings
-struct escaped_char : pegtl::seq<pegtl::one<'\\'>, pegtl::any> {};
-struct regular_char : pegtl::not_one<'"', '\\'> {};
-struct string_content : pegtl::star<pegtl::sor<escaped_char, regular_char>> {};
-struct quoted_string : pegtl::seq<pegtl::one<'"'>, string_content, pegtl::one<'"'>> {};
 
 // Value-description pair: <integer_value> "<description>"
 struct value_desc_pair : pegtl::seq<
@@ -94,6 +86,7 @@ struct value_description_state {
   bool in_value_pair = false;
   bool parsing_signal = false;
   int temp_message_id = 0;  // Store temp message ID in state instead of result
+  std::string current_description; // To store the current description being parsed
 };
 
 // Action handlers
@@ -131,33 +124,23 @@ struct action<grammar::identifier> {
   }
 };
 
-// String content for quoted strings
+// Handle quoted string - extract the full string with quotes
 template<>
-struct action<grammar::string_content> {
+struct action<grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, value_description_state& state) {
-    std::string content = in.string();
-    
     if (state.in_value_pair) {
-      // This is the description part of a value-description pair
-      // Unescape any escaped characters
-      std::string unescaped;
-      for (size_t i = 0; i < content.length(); ++i) {
-        if (content[i] == '\\' && i + 1 < content.length()) {
-          // Skip backslash and add the escaped character
-          unescaped += content[++i];
-        } else {
-          unescaped += content[i];
-        }
-      }
-      
-      // Add to the value descriptions map
-      state.result.value_descriptions[state.current_value] = unescaped;
+      // This is a quoted string in a value-description pair
+      std::string quoted = in.string();
+      // Use ParserBase::UnescapeString to properly handle escaped quotes
+      state.result.value_descriptions[state.current_value] = ParserBase::UnescapeString(quoted);
       state.in_value_pair = false;
     } else if (state.parsing_signal) {
       // This is a quoted signal name
-      // Create a pair with the message ID and signal name
-      state.result.identifier = std::make_pair(state.temp_message_id, content);
+      // Extract the content without quotes and store it
+      std::string quoted = in.string();
+      std::string name = ParserBase::UnescapeString(quoted);
+      state.result.identifier = std::make_pair(state.temp_message_id, name);
     }
   }
 };
@@ -178,23 +161,19 @@ struct action<grammar::integer_value> {
 
 // Main parser implementation
 std::optional<ValueDescription> ValueDescriptionParser::Parse(std::string_view input) {
-  // Skip any leading whitespace
-  auto it = input.begin();
-  while (it != input.end() && std::isspace(*it)) {
-    ++it;
-  }
-  
-  // Empty input check
-  if (it == input.end()) {
+  // Validate input using ParserBase method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
   
-  // Create PEGTL input
-  pegtl::memory_input<> in(input.data(), input.size(), "");
+  // Create state for parsing
   value_description_state state;
   
-  // Parse the input
   try {
+    // Create input for PEGTL parser using base class method
+    pegtl::memory_input<> in = CreateInput(input, "VAL_");
+    
+    // Parse the input
     const bool success = pegtl::parse<grammar::val_rule, action>(in, state);
     
     if (success && !state.result.value_descriptions.empty()) {
