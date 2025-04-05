@@ -1,4 +1,4 @@
-#include "dbc_parser/core/string_utils.h"
+#include "../../../src/dbc_parser/core/string_utils.h"
 
 #include <limits>
 #include <string>
