@@ -117,10 +117,13 @@ struct DbcFile {
   
   // VAL_ : signal values
   struct ValueDescription {
-    // Type of value description (SIGNAL or ENV_VAR)
-    // For ENV_VAR type, message_id will be -1
+    // Type of value description
+    ValueDescriptionType type = ValueDescriptionType::SIGNAL;
+    
+    // For SIGNAL type: message_id and signal_name are used
+    // For ENV_VAR type: message_id will be -1 and signal_name contains the environment variable name
     int message_id = 0;
-    std::string signal_name;  // For ENV_VAR, this contains the environment variable name
+    std::string signal_name;
     std::map<int, std::string> values;
   };
   std::vector<ValueDescription> value_descriptions;

@@ -126,6 +126,12 @@ struct BitTiming {
   double btr1_btr2;                    // Combined BTR1 and BTR2 register values
 };
 
+// Enum to identify the type of object that a value description is associated with
+enum class ValueDescriptionType {
+  SIGNAL,        // Signal value description (VAL_ <message id> <signal name>)
+  ENV_VAR        // Environment variable value description (VAL_ <env var name>)
+};
+
 // Value table structure
 struct ValueTable {
   std::string name;                    // Value table name

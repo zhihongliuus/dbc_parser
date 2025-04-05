@@ -7,14 +7,10 @@
 #include <string_view>
 #include <variant>
 
+#include "src/dbc_parser/parser/common_types.h"
+
 namespace dbc_parser {
 namespace parser {
-
-// Enum to identify the type of object that a value description is associated with
-enum class ValueDescriptionType {
-  SIGNAL,        // Signal value description (VAL_ <message id> <signal name>)
-  ENV_VAR        // Environment variable value description (VAL_ <env var name>)
-};
 
 // Structure to hold value description data from DBC file
 struct ValueDescription {

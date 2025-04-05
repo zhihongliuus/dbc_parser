@@ -186,17 +186,8 @@ struct attribute_value_state {
   std::string attr_name;
   std::string string_value;
   
-  // Attribute type tracking
-  enum class AttrType {
-    UNKNOWN,
-    NETWORK,
-    NODE,
-    MESSAGE,
-    SIGNAL,
-    ENV_VAR
-  };
-  
-  AttrType type = AttrType::UNKNOWN;
+  // Attribute type tracking using the common AttributeObjectType
+  AttributeObjectType type = AttributeObjectType::UNDEFINED;
   
   // Value type tracking
   bool has_numeric_value = false;
@@ -270,7 +261,7 @@ template<>
 struct action<grammar::network_attr> {
   template<typename ActionInput>
   static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.type = attribute_value_state::AttrType::NETWORK;
+    state.type = AttributeObjectType::NETWORK;
     state.attr_value.object_type = AttributeObjectType::UNDEFINED;
     state.attr_value.object_id = std::monostate{};
   }
@@ -281,7 +272,7 @@ template<>
 struct action<grammar::node_attr> {
   template<typename ActionInput>
   static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.type = attribute_value_state::AttrType::NODE;
+    state.type = AttributeObjectType::NODE;
     state.attr_value.object_type = AttributeObjectType::NODE;
     state.attr_value.object_id = state.node_name;
   }
@@ -292,7 +283,7 @@ template<>
 struct action<grammar::message_attr> {
   template<typename ActionInput>
   static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.type = attribute_value_state::AttrType::MESSAGE;
+    state.type = AttributeObjectType::MESSAGE;
     state.attr_value.object_type = AttributeObjectType::MESSAGE;
     state.attr_value.object_id = state.message_id;
   }
@@ -303,7 +294,7 @@ template<>
 struct action<grammar::signal_attr> {
   template<typename ActionInput>
   static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.type = attribute_value_state::AttrType::SIGNAL;
+    state.type = AttributeObjectType::SIGNAL;
     state.attr_value.object_type = AttributeObjectType::SIGNAL;
     state.attr_value.object_id = std::make_pair(state.message_id, state.signal_name);
   }
@@ -314,7 +305,7 @@ template<>
 struct action<grammar::env_var_attr> {
   template<typename ActionInput>
   static void apply(const ActionInput& /*in*/, attribute_value_state& state) {
-    state.type = attribute_value_state::AttrType::ENV_VAR;
+    state.type = AttributeObjectType::ENV_VAR;
     state.attr_value.object_type = AttributeObjectType::ENV_VAR;
     state.attr_value.object_id = state.env_var_name;
   }
