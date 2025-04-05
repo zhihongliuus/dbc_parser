@@ -1,16 +1,50 @@
 ###############################################################################
-# Bazel now uses Bzlmod by default to manage external dependencies.
-# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
+# MIGRATION TO BZLMOD
 #
-# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
+# This project is in the process of migrating to Bzlmod for dependency management.
+# Currently, we're in a hybrid state where:
+#
+# 1. Dependencies are declared in both WORKSPACE (legacy) and MODULE.bazel (modern)
+# 2. BUILD files have been updated to use modern repository names (@googletest)
+#
+# The next steps in the migration:
+# - Test building without the WORKSPACE file
+# - Remove the WORKSPACE file entirely when all dependency issues are resolved
 ###############################################################################
 
 module(
     name = "dbc_parser",
+    version = "0.1.0",
 )
 
-bazel_dep(name = "googletest", version = "1.14.0")
-bazel_dep(name = "rules_cc", version = "0.0.9")
+# Standard dependencies from the Bazel central registry with updated versions
+bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
+bazel_dep(name = "rules_cc", version = "0.0.17")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "rules_python", version = "0.40.0")
 
-# For PEGTL - currently need to keep it in WORKSPACE file
-# since it has a custom build file
+# For external repository management
+bazel_dep(name = "rules_foreign_cc", version = "0.9.0")
+
+# Make repositories directly accessible to build targets
+use_repo(googletest, "googletest")
+
+# Load repository rules
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# This repository is for PEGTL, which we need to use http_archive for as it's not in the central registry
+http_archive(
+    name = "taocpp_pegtl",
+    urls = ["https://github.com/taocpp/PEGTL/archive/3.2.7.zip"],
+    strip_prefix = "PEGTL-3.2.7",
+    sha256 = "f2ef563c0b0c3488b3aadb5404a8ce7a78985b4b0a9e0a96702305478c6e5af7",
+    build_file_content = """
+cc_library(
+    name = "pegtl",
+    hdrs = glob(["include/tao/pegtl/**/*.hpp", "include/tao/pegtl.hpp"]),
+    includes = ["include"],
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+""",
+) 
