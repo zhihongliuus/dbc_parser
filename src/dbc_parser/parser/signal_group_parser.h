@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "src/dbc_parser/parser/parser_base.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -22,7 +24,7 @@ struct SignalGroup {
 };
 
 // Parser for signal groups (SIG_GROUP_) in DBC files.
-class SignalGroupParser {
+class SignalGroupParser : public ParserBase {
  public:
   // Parses a signal group section from a DBC file.
   // Returns the parsed signal group if successful, or std::nullopt if parsing fails.

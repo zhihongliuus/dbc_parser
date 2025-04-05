@@ -141,6 +141,8 @@ cc_library(
     srcs = ["signal_group_parser.cc"],
     hdrs = ["signal_group_parser.h"],
     deps = [
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

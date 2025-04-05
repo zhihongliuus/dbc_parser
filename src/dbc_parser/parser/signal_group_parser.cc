@@ -8,6 +8,8 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/parse_tree.hpp>
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -16,20 +18,16 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for parsing signal groups in DBC files.
 namespace grammar {
 
-// Whitespace handling.
-struct ws : pegtl::star<pegtl::space> {};
-struct required_ws : pegtl::plus<pegtl::space> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using required_ws = common_grammar::req_ws;
+using colon = common_grammar::colon;
+using semicolon = common_grammar::semicolon;
+using identifier = common_grammar::identifier;
+using message_id = common_grammar::message_id;
 
 // Keyword for signal groups.
 struct sig_group_keyword : pegtl::string<'S', 'I', 'G', '_', 'G', 'R', 'O', 'U', 'P', '_'> {};
-
-// Message ID, which can be signed.
-struct sign : pegtl::opt<pegtl::one<'-'>> {};
-struct digits : pegtl::plus<pegtl::digit> {};
-struct message_id : pegtl::seq<sign, digits> {};
-
-// Identifier (for group name and signal names).
-struct identifier : pegtl::identifier {};
 
 // Repetitions count.
 struct repetitions : pegtl::plus<pegtl::digit> {};
@@ -38,10 +36,6 @@ struct repetitions : pegtl::plus<pegtl::digit> {};
 struct signal_name : pegtl::identifier {};
 // Modified to handle non-empty signal lists
 struct non_empty_signal_list : pegtl::list_must<signal_name, pegtl::one<','>, pegtl::space> {};
-
-// Colon and semicolon.
-struct colon : pegtl::one<':'> {};
-struct semicolon : pegtl::one<';'> {};
 
 // The complete signal group rule with explicit check for required components
 struct sig_group_rule : pegtl::seq<
@@ -120,16 +114,19 @@ struct action<grammar::signal_name> {
 };
 
 std::optional<SignalGroup> SignalGroupParser::Parse(std::string_view input) {
-  signal_group_state state;
-
-  // Check for required components in the input before parsing
-  // Missing semicolon at the end
-  if (input.empty() || input[input.length() - 1] != ';') {
+  // Validate input using ParserBase method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
 
+  // Additional validation specific to signal groups
   // Check for colon which is required in signal group definitions
   if (input.find(':') == std::string_view::npos) {
+    return std::nullopt;
+  }
+
+  // Check for semicolon which is required at the end
+  if (input.find(';') == std::string_view::npos) {
     return std::nullopt;
   }
 
@@ -141,7 +138,11 @@ std::optional<SignalGroup> SignalGroupParser::Parse(std::string_view input) {
     return std::nullopt;
   }
 
-  pegtl::memory_input in(input.data(), input.size(), "");
+  signal_group_state state;
+  
+  // Create input for PEGTL parser using base class method
+  pegtl::memory_input<> in = CreateInput(input, "SIG_GROUP_");
+  
   try {
     pegtl::parse<grammar::sig_group_rule, action>(in, state);
   } catch (const pegtl::parse_error& e) {
