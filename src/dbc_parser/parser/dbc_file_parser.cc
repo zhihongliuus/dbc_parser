@@ -29,6 +29,7 @@
 #include "src/dbc_parser/parser/signal_group_parser.h"
 #include "src/dbc_parser/parser/attribute_definition_parser.h"
 #include "src/dbc_parser/parser/attribute_definition_default_parser.h"
+#include "src/dbc_parser/parser/attribute_value_parser.h"
 
 
 // Only include parsers that are actually used in this file
@@ -1364,6 +1365,86 @@ struct action<grammar::direct_attr_def_def_line> {
       state.found_valid_section = true;
     } else {
       std::cout << "Failed to parse direct attribute definition default" << std::endl;
+    }
+  }
+};
+
+// Actions for BA_ section (attribute values)
+template<>
+struct action<grammar::attr_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_attr_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::attr_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.attr_content.empty()) {
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.attr_content);
+      
+      auto attr_value_result = AttributeValueParser::Parse(content);
+      if (attr_value_result) {
+        // Create a new attribute value
+        DbcFile::AttributeValue attr_value;
+        attr_value.attr_name = attr_value_result->name;
+        
+        // Set appropriate fields based on the object type
+        switch (attr_value_result->object_type) {
+          case AttributeObjectType::NETWORK:
+            // Network-level attribute, no specific identifier needed
+            break;
+            
+          case AttributeObjectType::NODE:
+            // Node attribute, set the node name
+            if (std::holds_alternative<std::string>(attr_value_result->object_id)) {
+              attr_value.node_name = std::get<std::string>(attr_value_result->object_id);
+            }
+            break;
+            
+          case AttributeObjectType::MESSAGE:
+            // Message attribute, set the message ID
+            if (std::holds_alternative<int>(attr_value_result->object_id)) {
+              attr_value.message_id = std::get<int>(attr_value_result->object_id);
+            }
+            break;
+            
+          case AttributeObjectType::SIGNAL:
+            // Signal attribute, set both message ID and signal name
+            if (std::holds_alternative<std::pair<int, std::string>>(attr_value_result->object_id)) {
+              const auto& [msg_id, sig_name] = std::get<std::pair<int, std::string>>(attr_value_result->object_id);
+              attr_value.message_id = msg_id;
+              attr_value.signal_name = sig_name;
+            }
+            break;
+            
+          case AttributeObjectType::ENV_VAR:
+            // Environment variable attribute, set the env var name
+            if (std::holds_alternative<std::string>(attr_value_result->object_id)) {
+              attr_value.env_var_name = std::get<std::string>(attr_value_result->object_id);
+            }
+            break;
+            
+          default:
+            break;
+        }
+        
+        // Convert attribute value to string
+        if (std::holds_alternative<int>(attr_value_result->value)) {
+          attr_value.value = std::to_string(std::get<int>(attr_value_result->value));
+        } else if (std::holds_alternative<double>(attr_value_result->value)) {
+          attr_value.value = std::to_string(std::get<double>(attr_value_result->value));
+        } else if (std::holds_alternative<std::string>(attr_value_result->value)) {
+          attr_value.value = std::get<std::string>(attr_value_result->value);
+        }
+        
+        // Add the attribute value to the list
+        state.dbc_file.attribute_values.push_back(attr_value);
+        state.found_valid_section = true;
+      }
     }
   }
 };

@@ -637,6 +637,86 @@ BA_DEF_DEF_ "GenSigStartValue" 0;
   EXPECT_EQ(result->attribute_defaults.at("GenSigStartValue"), "0");
 }
 
+// Test parsing attribute values
+TEST_F(DbcFileParserTest, ParsesAttributeValues) {
+  const std::string kInput = R"(
+VERSION "1.0"
+BA_DEF_ "NetworkAttr" INT 0 100;
+BA_DEF_ BU_ "NodeAttr" INT 0 100;
+BA_DEF_ BO_ "MessageAttr" INT 0 100;
+BA_DEF_ SG_ "SignalAttr" INT 0 100;
+BA_DEF_ EV_ "EnvVarAttr" INT 0 100;
+BA_ "NetworkAttr" 42;
+BA_ "NodeAttr" BU_ "Node1" 43;
+BA_ "MessageAttr" BO_ 123 44;
+BA_ "SignalAttr" SG_ 123 "Signal1" 45;
+BA_ "EnvVarAttr" EV_ "EnvVar1" 46;
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  
+  EXPECT_EQ(result->attribute_values.size(), 5);
+  
+  // Verify network attribute
+  bool found_network_attr = false;
+  for (const auto& attr : result->attribute_values) {
+    if (attr.attr_name == "NetworkAttr" && attr.node_name.empty() && 
+        attr.message_id == 0 && attr.signal_name.empty() && attr.env_var_name.empty()) {
+      EXPECT_EQ(attr.value, "42");
+      found_network_attr = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_network_attr);
+  
+  // Verify node attribute
+  bool found_node_attr = false;
+  for (const auto& attr : result->attribute_values) {
+    if (attr.attr_name == "NodeAttr" && attr.node_name == "Node1") {
+      EXPECT_EQ(attr.value, "43");
+      found_node_attr = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_node_attr);
+  
+  // Verify message attribute
+  bool found_message_attr = false;
+  for (const auto& attr : result->attribute_values) {
+    if (attr.attr_name == "MessageAttr" && attr.message_id == 123 && 
+        attr.signal_name.empty()) {
+      EXPECT_EQ(attr.value, "44");
+      found_message_attr = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_message_attr);
+  
+  // Verify signal attribute
+  bool found_signal_attr = false;
+  for (const auto& attr : result->attribute_values) {
+    if (attr.attr_name == "SignalAttr" && attr.message_id == 123 && 
+        attr.signal_name == "Signal1") {
+      EXPECT_EQ(attr.value, "45");
+      found_signal_attr = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_signal_attr);
+  
+  // Verify environment variable attribute
+  bool found_env_var_attr = false;
+  for (const auto& attr : result->attribute_values) {
+    if (attr.attr_name == "EnvVarAttr" && attr.env_var_name == "EnvVar1") {
+      EXPECT_EQ(attr.value, "46");
+      found_env_var_attr = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_env_var_attr);
+}
+
 }  // namespace
 }  // namespace parser
 }  // namespace dbc_parser 

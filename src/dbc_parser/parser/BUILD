@@ -233,6 +233,7 @@ cc_library(
         ":signal_group_parser",
         ":attribute_definition_parser",
         ":attribute_definition_default_parser",
+        ":attribute_value_parser",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
