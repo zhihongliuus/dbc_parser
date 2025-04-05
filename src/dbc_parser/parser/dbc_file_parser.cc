@@ -47,8 +47,18 @@ using dbc_parser::core::StringUtils;
 // Helper for string operations
 class StringUtilities {
 public:
+  // Make class non-instantiable as it only contains static utility methods
+  StringUtilities() = delete;
+  ~StringUtilities() = delete;
+
+  // Prevent copying and moving
+  StringUtilities(const StringUtilities&) = delete;
+  StringUtilities& operator=(const StringUtilities&) = delete;
+  StringUtilities(StringUtilities&&) = delete;
+  StringUtilities& operator=(StringUtilities&&) = delete;
+
   // Split a string by a delimiter character and return a vector of trimmed tokens
-  static std::vector<std::string> SplitTrimmed(const std::string& str, char delimiter) {
+  [[nodiscard]] static std::vector<std::string> SplitTrimmed(const std::string& str, char delimiter) noexcept {
     std::vector<std::string> tokens = StringUtils::Split(str, delimiter);
     for (auto& token : tokens) {
       token = StringUtils::Trim(token);
@@ -57,7 +67,7 @@ public:
   }
   
   // Split a string by multiple delimiters and return a vector of trimmed tokens
-  static std::vector<std::string> SplitTrimmedByAny(const std::string& str, const std::string& delimiters) {
+  [[nodiscard]] static std::vector<std::string> SplitTrimmedByAny(const std::string& str, const std::string& delimiters) noexcept {
     std::vector<std::string> tokens = StringUtils::SplitByAny(str, delimiters);
     for (auto& token : tokens) {
       token = StringUtils::Trim(token);
@@ -66,32 +76,32 @@ public:
   }
   
   // Trim whitespace from start and end of string
-  static std::string Trim(const std::string& str) {
+  [[nodiscard]] static std::string Trim(const std::string& str) noexcept {
     return StringUtils::Trim(str);
   }
   
   // Extract string content between quotes
-  static std::optional<std::string> ExtractQuoted(const std::string& str) {
+  [[nodiscard]] static std::optional<std::string> ExtractQuoted(const std::string& str) noexcept {
     return StringUtils::ExtractQuoted(str);
   }
   
   // Remove quotes from a string if present
-  static std::string StripQuotes(const std::string& str) {
+  [[nodiscard]] static std::string StripQuotes(const std::string& str) noexcept {
     return StringUtils::StripQuotes(str);
   }
   
   // Parse a string as an integer
-  static std::optional<int64_t> ParseInt(const std::string& str) {
+  [[nodiscard]] static std::optional<int64_t> ParseInt(const std::string& str) noexcept {
     return StringUtils::ParseInt(str);
   }
   
   // Parse a string as a double
-  static std::optional<double> ParseDouble(const std::string& str) {
+  [[nodiscard]] static std::optional<double> ParseDouble(const std::string& str) noexcept {
     return StringUtils::ParseDouble(str);
   }
   
   // Join a vector of strings with a delimiter
-  static std::string Join(const std::vector<std::string>& parts, const std::string& delimiter) {
+  [[nodiscard]] static std::string Join(const std::vector<std::string>& parts, const std::string& delimiter) noexcept {
     return StringUtils::Join(parts, delimiter);
   }
 };

@@ -188,19 +188,21 @@ struct DbcFile {
   std::vector<SignalValueType> signal_value_types;
 
   // Main struct constructor/destructor
-  DbcFile() = default;
-  ~DbcFile() = default;
+  DbcFile() noexcept = default;
+  ~DbcFile() noexcept = default;
 };
 
 // Main parser class for DBC files
 class DbcFileParser {
  public:
-  DbcFileParser() = default;
-  ~DbcFileParser() = default;
+  DbcFileParser() noexcept = default;
+  ~DbcFileParser() noexcept = default;
 
-  // Disable copy operations
+  // Disable copy and move operations
   DbcFileParser(const DbcFileParser&) = delete;
   DbcFileParser& operator=(const DbcFileParser&) = delete;
+  DbcFileParser(DbcFileParser&&) = delete;
+  DbcFileParser& operator=(DbcFileParser&&) = delete;
 
   // Parse a DBC file content and return a DbcFile structure
   // Returns nullopt if parsing fails
