@@ -234,6 +234,7 @@ cc_library(
         ":attribute_definition_parser",
         ":attribute_definition_default_parser",
         ":attribute_value_parser",
+        ":value_description_parser",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

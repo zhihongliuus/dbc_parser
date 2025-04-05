@@ -30,6 +30,7 @@
 #include "src/dbc_parser/parser/attribute_definition_parser.h"
 #include "src/dbc_parser/parser/attribute_definition_default_parser.h"
 #include "src/dbc_parser/parser/attribute_value_parser.h"
+#include "src/dbc_parser/parser/value_description_parser.h"
 
 
 // Only include parsers that are actually used in this file
@@ -1383,56 +1384,56 @@ struct action<grammar::attr_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.attr_content.empty()) {
+      std::cout << "Original attribute content: '" << state.attr_content << "'" << std::endl;
+      
       // Trim any trailing newlines and whitespace
       std::string content = StringUtilities::Trim(state.attr_content);
+      std::cout << "Cleaned attribute content: '" << content << "'" << std::endl;
       
+      // Use the AttributeValueParser to parse the attribute value
       auto attr_value_result = AttributeValueParser::Parse(content);
+      
       if (attr_value_result) {
-        // Create a new attribute value
+        std::cout << "Successfully parsed attribute value: " << attr_value_result->name << std::endl;
+        
+        // Create DbcFile::AttributeValue from the parsed result
         DbcFile::AttributeValue attr_value;
         attr_value.attr_name = attr_value_result->name;
         
-        // Set appropriate fields based on the object type
+        // Set the appropriate fields based on object type
         switch (attr_value_result->object_type) {
           case AttributeObjectType::NETWORK:
-            // Network-level attribute, no specific identifier needed
+            // Network attribute has no specific identifiers
             break;
             
           case AttributeObjectType::NODE:
-            // Node attribute, set the node name
             if (std::holds_alternative<std::string>(attr_value_result->object_id)) {
               attr_value.node_name = std::get<std::string>(attr_value_result->object_id);
             }
             break;
             
           case AttributeObjectType::MESSAGE:
-            // Message attribute, set the message ID
             if (std::holds_alternative<int>(attr_value_result->object_id)) {
               attr_value.message_id = std::get<int>(attr_value_result->object_id);
             }
             break;
             
           case AttributeObjectType::SIGNAL:
-            // Signal attribute, set both message ID and signal name
             if (std::holds_alternative<std::pair<int, std::string>>(attr_value_result->object_id)) {
-              const auto& [msg_id, sig_name] = std::get<std::pair<int, std::string>>(attr_value_result->object_id);
-              attr_value.message_id = msg_id;
-              attr_value.signal_name = sig_name;
+              const auto& id_pair = std::get<std::pair<int, std::string>>(attr_value_result->object_id);
+              attr_value.message_id = id_pair.first;
+              attr_value.signal_name = id_pair.second;
             }
             break;
             
           case AttributeObjectType::ENV_VAR:
-            // Environment variable attribute, set the env var name
             if (std::holds_alternative<std::string>(attr_value_result->object_id)) {
               attr_value.env_var_name = std::get<std::string>(attr_value_result->object_id);
             }
             break;
-            
-          default:
-            break;
         }
         
-        // Convert attribute value to string
+        // Convert attribute value to string representation
         if (std::holds_alternative<int>(attr_value_result->value)) {
           attr_value.value = std::to_string(std::get<int>(attr_value_result->value));
         } else if (std::holds_alternative<double>(attr_value_result->value)) {
@@ -1444,6 +1445,57 @@ struct action<grammar::attr_section> {
         // Add the attribute value to the list
         state.dbc_file.attribute_values.push_back(attr_value);
         state.found_valid_section = true;
+        
+        std::cout << "Added attribute value: " << attr_value.attr_name << " = " << attr_value.value << std::endl;
+      } else {
+        std::cout << "Failed to parse attribute value" << std::endl;
+      }
+    } else {
+      std::cout << "Empty attribute content" << std::endl;
+    }
+  }
+};
+
+// Actions for VAL_ section (value descriptions)
+template<>
+struct action<grammar::value_desc_line> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, dbc_state& state) {
+    state.set_value_desc_content(in.string());
+  }
+};
+
+template<>
+struct action<grammar::value_desc_section> {
+  template<typename ActionInput>
+  static void apply(const ActionInput&, dbc_state& state) {
+    if (!state.value_desc_content.empty()) {
+      // Trim any trailing newlines and whitespace
+      std::string content = StringUtilities::Trim(state.value_desc_content);
+      
+      // Use the ValueDescriptionParser to parse the value description
+      auto value_desc_result = ValueDescriptionParser::Parse(content);
+      
+      if (value_desc_result) {
+        // Create a new value description and add it to the list
+        DbcFile::ValueDescription value_desc;
+        
+        // Set fields based on the description type
+        if (std::holds_alternative<std::pair<int, std::string>>(value_desc_result->identifier)) {
+          // For signal value descriptions, we need message ID and signal name
+          const auto& id_pair = std::get<std::pair<int, std::string>>(value_desc_result->identifier);
+          value_desc.message_id = id_pair.first;
+          value_desc.signal_name = id_pair.second;
+          
+          // Copy the value descriptions map to values
+          for (const auto& [val, desc] : value_desc_result->value_descriptions) {
+            value_desc.values[val] = desc;
+          }
+          
+          // Add to the DBC file
+          state.dbc_file.value_descriptions.push_back(value_desc);
+          state.found_valid_section = true;
+        }
       }
     }
   }

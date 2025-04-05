@@ -717,6 +717,49 @@ BA_ "EnvVarAttr" EV_ "EnvVar1" 46;
   EXPECT_TRUE(found_env_var_attr);
 }
 
+// Test parsing value descriptions
+TEST_F(DbcFileParserTest, ParsesValueDescriptions) {
+  const std::string kInput = R"(
+VERSION "1.0"
+VAL_ 123 "SignalA" 0 "Off" 1 "On" 2 "Error";
+VAL_ 456 "SignalB" 0 "Inactive" 1 "Active" 2 "Fault";
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  
+  // Check that we have 2 value descriptions
+  ASSERT_EQ(result->value_descriptions.size(), 2);
+  
+  // Find value description for SignalA in message 123
+  bool found_signal_a = false;
+  for (const auto& val_desc : result->value_descriptions) {
+    if (val_desc.message_id == 123 && val_desc.signal_name == "SignalA") {
+      found_signal_a = true;
+      ASSERT_EQ(val_desc.values.size(), 3);
+      EXPECT_EQ(val_desc.values.at(0), "Off");
+      EXPECT_EQ(val_desc.values.at(1), "On");
+      EXPECT_EQ(val_desc.values.at(2), "Error");
+      break;
+    }
+  }
+  EXPECT_TRUE(found_signal_a);
+  
+  // Find value description for SignalB in message 456
+  bool found_signal_b = false;
+  for (const auto& val_desc : result->value_descriptions) {
+    if (val_desc.message_id == 456 && val_desc.signal_name == "SignalB") {
+      found_signal_b = true;
+      ASSERT_EQ(val_desc.values.size(), 3);
+      EXPECT_EQ(val_desc.values.at(0), "Inactive");
+      EXPECT_EQ(val_desc.values.at(1), "Active");
+      EXPECT_EQ(val_desc.values.at(2), "Fault");
+      break;
+    }
+  }
+  EXPECT_TRUE(found_signal_b);
+}
+
 }  // namespace
 }  // namespace parser
 }  // namespace dbc_parser 

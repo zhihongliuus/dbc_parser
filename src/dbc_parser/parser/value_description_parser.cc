@@ -1,233 +1,207 @@
 #include "src/dbc_parser/parser/value_description_parser.h"
 
-#include <map>
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "tao/pegtl.hpp"
-#include "tao/pegtl/contrib/analyze.hpp"
 
 namespace dbc_parser {
 namespace parser {
 
 namespace pegtl = tao::pegtl;
 
-// Grammar rules for Value Description parsing (VAL_)
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
+// Basic grammar components
+struct ws : pegtl::plus<pegtl::space> {};
+struct optional_ws : pegtl::star<pegtl::space> {};
+struct semicolon : pegtl::one<';'> {};
 
-// VAL_ keyword
+// Keywords
 struct val_keyword : pegtl::string<'V', 'A', 'L', '_'> {};
 
-// Message ID
-struct message_id : pegtl::seq<
-                      pegtl::opt<pegtl::one<'-'>>,
-                      pegtl::plus<pegtl::digit>
-                    > {};
+// Identifiers and values
+struct identifier : pegtl::seq<
+  pegtl::alpha,
+  pegtl::star<pegtl::sor<pegtl::alpha, pegtl::digit, pegtl::one<'_'>>>
+> {};
 
-// Integer (for values)
-struct integer_value : pegtl::seq<
-                         pegtl::opt<pegtl::one<'-'>>,
-                         pegtl::plus<pegtl::digit>
-                       > {};
+struct message_id : pegtl::seq<pegtl::opt<pegtl::one<'-'>>, pegtl::plus<pegtl::digit>> {};
+struct integer_value : pegtl::seq<pegtl::opt<pegtl::one<'-'>>, pegtl::plus<pegtl::digit>> {};
 
-// Valid identifier character
-struct id_char : pegtl::sor<
-                   pegtl::alpha,
-                   pegtl::digit,
-                   pegtl::one<'_'>,
-                   pegtl::one<'-'>
-                 > {};
-
-// Signal name
-struct signal_name : pegtl::plus<id_char> {};
-
-// Environment variable name
-struct env_var_name : pegtl::plus<id_char> {};
-
-// Rules for quoted strings with escaping
+// String parsing for quoted strings
 struct escaped_char : pegtl::seq<pegtl::one<'\\'>, pegtl::any> {};
 struct regular_char : pegtl::not_one<'"', '\\'> {};
 struct string_content : pegtl::star<pegtl::sor<escaped_char, regular_char>> {};
 struct quoted_string : pegtl::seq<pegtl::one<'"'>, string_content, pegtl::one<'"'>> {};
 
-// Value-description pair
-struct value_desc_pair : pegtl::seq<integer_value, ws, quoted_string> {};
-
-// Multiple value-description pairs
-struct value_desc_pairs : pegtl::list<value_desc_pair, ws> {};
-
-// Semicolon at the end
-struct semicolon : pegtl::one<';'> {};
+// Value-description pair: <integer_value> "<description>"
+struct value_desc_pair : pegtl::seq<
+  integer_value,
+  ws,
+  quoted_string
+> {};
 
 // Signal value description rule: VAL_ <message_id> <signal_name> <value_desc_pairs>;
-struct signal_val_rule : pegtl::seq<
-                          val_keyword,
-                          ws,
-                          message_id,            // Message ID
-                          ws,
-                          signal_name,           // Signal name
-                          ws,
-                          value_desc_pairs,      // Value-description pairs
-                          ws,
-                          semicolon
-                        > {};
+struct signal_value_desc : pegtl::seq<
+  val_keyword,
+  ws,
+  message_id,
+  ws,
+  pegtl::sor<
+    quoted_string,      // Signal name can be quoted
+    identifier          // or unquoted identifier
+  >,
+  pegtl::star<
+    pegtl::seq<
+      ws,
+      value_desc_pair
+    >
+  >,
+  optional_ws,
+  semicolon
+> {};
 
 // Environment variable value description rule: VAL_ <env_var_name> <value_desc_pairs>;
-struct env_var_val_rule : pegtl::seq<
-                            val_keyword,
-                            ws,
-                            env_var_name,         // Environment variable name
-                            ws,
-                            value_desc_pairs,     // Value-description pairs
-                            ws,
-                            semicolon
-                          > {};
+struct env_var_value_desc : pegtl::seq<
+  val_keyword,
+  ws,
+  identifier,
+  pegtl::star<
+    pegtl::seq<
+      ws,
+      value_desc_pair
+    >
+  >,
+  optional_ws,
+  semicolon
+> {};
 
-// Complete VAL_ rule - try signal first, then env var
-struct val_rule : pegtl::sor<signal_val_rule, env_var_val_rule> {};
+// Main VAL_ rule (try signal first, then env var)
+struct val_rule : pegtl::sor<signal_value_desc, env_var_value_desc> {};
 
 } // namespace grammar
 
-// Data structure to collect parsing results
+// State for parsing
 struct value_description_state {
-  ValueDescription value_description;
-  bool in_signal_rule = false;
-  int message_id = 0;
-  std::string signal_or_env_name;
+  ValueDescription result;
   int current_value = 0;
-  bool parsing_value = true;  // Flag to know we're parsing a value (not a message ID)
-  bool in_value_pair = false; // Flag to know we're inside a value-description pair
+  bool in_value_pair = false;
+  bool parsing_signal = false;
+  int temp_message_id = 0;  // Store temp message ID in state instead of result
 };
 
-// PEGTL actions
+// Action handlers
 template<typename Rule>
 struct action : pegtl::nothing<Rule> {};
 
-// Signal rule was matched
-template<>
-struct action<grammar::signal_val_rule> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, value_description_state& state) {
-    state.in_signal_rule = true;
-    state.value_description.type = ValueDescriptionType::SIGNAL;
-  }
-};
-
-// Env var rule was matched
-template<>
-struct action<grammar::env_var_val_rule> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, value_description_state& state) {
-    state.in_signal_rule = false;
-    state.value_description.type = ValueDescriptionType::ENV_VAR;
-  }
-};
-
-// Extract message ID
+// Message ID
 template<>
 struct action<grammar::message_id> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, value_description_state& state) {
-    state.message_id = std::stoi(in.string());
+    state.parsing_signal = true;
+    state.result.type = ValueDescriptionType::SIGNAL;
+    
+    // Store message ID in state
+    state.temp_message_id = std::stoi(in.string());
   }
 };
 
-// Extract value in value-description pair
+// Identifier (for unquoted signal names or env var names)
 template<>
-struct action<grammar::integer_value> {
+struct action<grammar::identifier> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, value_description_state& state) {
-    state.current_value = std::stoi(in.string());
-    state.in_value_pair = true;
+    std::string name = in.string();
+    
+    if (state.parsing_signal) {
+      // For signals, create a pair with the message ID and signal name
+      state.result.identifier = std::make_pair(state.temp_message_id, name);
+    } else {
+      // For environment variables, just store the name
+      state.result.type = ValueDescriptionType::ENV_VAR;
+      state.result.identifier = name;
+    }
   }
 };
 
-// Extract signal name
-template<>
-struct action<grammar::signal_name> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, value_description_state& state) {
-    state.signal_or_env_name = in.string();
-    // Construct signal identifier
-    state.value_description.identifier = std::make_pair(state.message_id, state.signal_or_env_name);
-  }
-};
-
-// Extract environment variable name
-template<>
-struct action<grammar::env_var_name> {
-  template<typename ActionInput>
-  static void apply(const ActionInput& in, value_description_state& state) {
-    state.signal_or_env_name = in.string();
-    // Set environment variable identifier
-    state.value_description.identifier = state.signal_or_env_name;
-  }
-};
-
-// Extract description string
+// String content for quoted strings
 template<>
 struct action<grammar::string_content> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, value_description_state& state) {
+    std::string content = in.string();
+    
     if (state.in_value_pair) {
-      // This is a description in a value-description pair
-      std::string description = in.string();
-      
+      // This is the description part of a value-description pair
       // Unescape any escaped characters
       std::string unescaped;
-      for (size_t i = 0; i < description.length(); ++i) {
-        if (description[i] == '\\' && i + 1 < description.length()) {
+      for (size_t i = 0; i < content.length(); ++i) {
+        if (content[i] == '\\' && i + 1 < content.length()) {
           // Skip backslash and add the escaped character
-          unescaped += description[++i];
+          unescaped += content[++i];
         } else {
-          unescaped += description[i];
+          unescaped += content[i];
         }
       }
       
-      // Add to value descriptions map
-      state.value_description.value_descriptions[state.current_value] = unescaped;
+      // Add to the value descriptions map
+      state.result.value_descriptions[state.current_value] = unescaped;
       state.in_value_pair = false;
+    } else if (state.parsing_signal) {
+      // This is a quoted signal name
+      // Create a pair with the message ID and signal name
+      state.result.identifier = std::make_pair(state.temp_message_id, content);
     }
   }
 };
 
-// Track the start of a value-description pair
+// Integer value
 template<>
-struct action<grammar::value_desc_pair> {
+struct action<grammar::integer_value> {
   template<typename ActionInput>
-  static void apply(const ActionInput& /*in*/, value_description_state& state) {
-    state.in_value_pair = false; // Reset for next pair
+  static void apply(const ActionInput& in, value_description_state& state) {
+    // Check if we've already processed message ID and signal name
+    if (state.result.identifier.index() != std::variant_npos) {
+      // We're in a value-description pair
+      state.current_value = std::stoi(in.string());
+      state.in_value_pair = true;
+    }
   }
 };
 
+// Main parser implementation
 std::optional<ValueDescription> ValueDescriptionParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Skip any leading whitespace
+  auto it = input.begin();
+  while (it != input.end() && std::isspace(*it)) {
+    ++it;
+  }
+  
+  // Empty input check
+  if (it == input.end()) {
     return std::nullopt;
   }
-
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "VAL_");
   
-  // Create state to collect results
+  // Create PEGTL input
+  pegtl::memory_input<> in(input.data(), input.size(), "");
   value_description_state state;
-  state.in_value_pair = false;
   
+  // Parse the input
   try {
-    // Parse input using our grammar and actions
-    if (pegtl::parse<grammar::val_rule, action>(in, state)) {
-      // Ensure we have at least one value description
-      if (state.value_description.value_descriptions.empty()) {
-        return std::nullopt;
-      }
-      return state.value_description;
+    const bool success = pegtl::parse<grammar::val_rule, action>(in, state);
+    
+    if (success && !state.result.value_descriptions.empty()) {
+      // Parsing succeeded and we have at least one value description
+      return state.result;
     }
-  } catch (const pegtl::parse_error&) {
+  } catch (const pegtl::parse_error& e) {
     // Parse error - return nullopt
     return std::nullopt;
   }
