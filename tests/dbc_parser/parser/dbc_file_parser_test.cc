@@ -760,6 +760,57 @@ VAL_ 456 "SignalB" 0 "Inactive" 1 "Active" 2 "Fault";
   EXPECT_TRUE(found_signal_b);
 }
 
+// Test parsing environment variable value descriptions
+TEST_F(DbcFileParserTest, ParsesEnvironmentVariableValueDescriptions) {
+  const std::string kInput = R"(
+VERSION "1.0"
+VAL_ EngineTemp 0 "Cold" 1 "Normal" 2 "Overheating";
+VAL_ VehicleMode 0 "Parked" 1 "Driving" 2 "Reverse" 3 "Neutral";
+)";
+
+  auto result = parser_->Parse(kInput);
+  ASSERT_TRUE(result.has_value());
+  
+  // Check that we have 2 environment variable value descriptions
+  // Count environment variable value descriptions (those with message_id = -1)
+  int env_var_count = 0;
+  for (const auto& val_desc : result->value_descriptions) {
+    if (val_desc.message_id == -1) {
+      env_var_count++;
+    }
+  }
+  ASSERT_EQ(env_var_count, 2);
+  
+  // Find value description for EngineTemp
+  bool found_engine_temp = false;
+  for (const auto& val_desc : result->value_descriptions) {
+    if (val_desc.message_id == -1 && val_desc.signal_name == "EngineTemp") {
+      found_engine_temp = true;
+      ASSERT_EQ(val_desc.values.size(), 3);
+      EXPECT_EQ(val_desc.values.at(0), "Cold");
+      EXPECT_EQ(val_desc.values.at(1), "Normal");
+      EXPECT_EQ(val_desc.values.at(2), "Overheating");
+      break;
+    }
+  }
+  EXPECT_TRUE(found_engine_temp);
+  
+  // Find value description for VehicleMode
+  bool found_vehicle_mode = false;
+  for (const auto& val_desc : result->value_descriptions) {
+    if (val_desc.message_id == -1 && val_desc.signal_name == "VehicleMode") {
+      found_vehicle_mode = true;
+      ASSERT_EQ(val_desc.values.size(), 4);
+      EXPECT_EQ(val_desc.values.at(0), "Parked");
+      EXPECT_EQ(val_desc.values.at(1), "Driving");
+      EXPECT_EQ(val_desc.values.at(2), "Reverse");
+      EXPECT_EQ(val_desc.values.at(3), "Neutral");
+      break;
+    }
+  }
+  EXPECT_TRUE(found_vehicle_mode);
+}
+
 }  // namespace
 }  // namespace parser
 }  // namespace dbc_parser 
