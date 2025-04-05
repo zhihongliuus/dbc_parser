@@ -167,7 +167,7 @@ class DbcFileParser {
 
   // Parse a DBC file content and return a DbcFile structure
   // Returns nullopt if parsing fails
-  std::optional<DbcFile> Parse(std::string_view input);
+  [[nodiscard]] std::optional<DbcFile> Parse(std::string_view input);
 };
 
 }  // namespace parser

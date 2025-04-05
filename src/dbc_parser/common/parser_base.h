@@ -75,7 +75,7 @@ class ParserBase {
    * @return A PEGTL memory input object
    */
   [[nodiscard]] static pegtl::memory_input<> CreateInput(
-      std::string_view input, const std::string& source_name) {
+      std::string_view input, const std::string& source_name) noexcept {
     return pegtl::memory_input<>(input.data(), input.size(), source_name);
   }
 };
