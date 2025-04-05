@@ -65,7 +65,7 @@ struct symbols_action : pegtl::nothing<Rule> {};
 template<>
 struct symbols_action<grammar::symbol> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, symbols_state& state) {
+  static void apply(const ActionInput& in, symbols_state& state) noexcept {
     state.symbols.push_back(in.string());
   }
 };

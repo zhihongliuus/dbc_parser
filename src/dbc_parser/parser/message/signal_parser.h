@@ -20,7 +20,7 @@ class SignalParser : public ParserBase {
   //
   // Example format:
   // SG_ SignalName : 8|16@1+ (0.1,0) [0|655.35] "km/h" ECU1,ECU2
-  static std::optional<Signal> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<Signal> Parse(std::string_view input);
 };
 
 }  // namespace parser

@@ -63,7 +63,7 @@ struct action : pegtl::nothing<Rule> {};
 template<>
 struct action<grammar::node_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, nodes_state& state) {
+  static void apply(const ActionInput& in, nodes_state& state) noexcept {
     Node node;
     node.name = in.string();
     state.nodes.push_back(node);

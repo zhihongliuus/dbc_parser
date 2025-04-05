@@ -17,7 +17,7 @@ class MessageParser : public ParserBase {
  public:
   // Parses a message section from the given input
   // Returns std::nullopt if parsing fails
-  static std::optional<Message> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<Message> Parse(std::string_view input);
 };
 
 }  // namespace parser

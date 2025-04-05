@@ -1402,6 +1402,11 @@ struct action<grammar::attr_section> {
         
         // Set the appropriate fields based on object type
         switch (attr_value_result->object_type) {
+          case AttributeObjectType::UNDEFINED:
+            // Handle undefined attribute object type
+            // In most cases, we'll skip or log this, but we include it for completeness
+            break;
+            
           case AttributeObjectType::NETWORK:
             // Network attribute has no specific identifiers
             break;

@@ -181,26 +181,30 @@ struct action : pegtl::nothing<Rule> {};
 template<>
 struct action<grammar::integer> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     // Determine where to store the integer value based on context
-    if (!state.in_signal) {
-      // We're in the message header, potential targets: ID, DLC
-      if (state.message.id == 0) {
-        state.message.id = std::stoi(in.string());
-      } else if (state.message.dlc == 0) {
-        state.message.dlc = std::stoi(in.string());
+    try {
+      if (!state.in_signal) {
+        // We're in the message header, potential targets: ID, DLC
+        if (state.message.id == 0) {
+          state.message.id = std::stoi(in.string());
+        } else if (state.message.dlc == 0) {
+          state.message.dlc = std::stoi(in.string());
+        }
+      } else {
+        // We're in a signal definition, potential targets: start_bit, length, etc.
+        static int signal_int_field = 0;
+        
+        if (signal_int_field == 0) { // Start bit
+          state.current_signal.start_bit = std::stoi(in.string());
+          signal_int_field = 1;
+        } else if (signal_int_field == 1) { // Length
+          state.current_signal.length = std::stoi(in.string());
+          signal_int_field = 0;
+        }
       }
-    } else {
-      // We're in a signal definition, potential targets: start_bit, length, etc.
-      static int signal_int_field = 0;
-      
-      if (signal_int_field == 0) { // Start bit
-        state.current_signal.start_bit = std::stoi(in.string());
-        signal_int_field = 1;
-      } else if (signal_int_field == 1) { // Length
-        state.current_signal.length = std::stoi(in.string());
-        signal_int_field = 0;
-      }
+    } catch (const std::exception&) {
+      // Handle conversion errors gracefully
     }
   }
 };
@@ -209,7 +213,7 @@ struct action<grammar::integer> {
 template<>
 struct action<grammar::message_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     state.message.name = in.string();
   }
 };
@@ -218,7 +222,7 @@ struct action<grammar::message_name> {
 template<>
 struct action<grammar::node_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     if (!state.in_signal) {
       // We're in the message header, this is the sender
       if (state.message.sender.empty()) {
@@ -235,7 +239,7 @@ struct action<grammar::node_name> {
 template<>
 struct action<grammar::signal_name> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     state.in_signal = true;
     state.current_signal = Signal();
     state.current_signal.name = in.string();
@@ -246,7 +250,7 @@ struct action<grammar::signal_name> {
 template<>
 struct action<grammar::multiplexor> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     state.current_signal.multiplex_type = MultiplexType::kMultiplexor;
     state.current_multiplex = in.string();
   }
@@ -256,10 +260,15 @@ struct action<grammar::multiplexor> {
 template<>
 struct action<grammar::multiplexed> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     state.current_signal.multiplex_type = MultiplexType::kMultiplexed;
-    std::string value = in.string().substr(1); // Skip 'm'
-    state.current_signal.multiplex_value = std::stoi(value);
+    try {
+      std::string value = in.string().substr(1); // Skip 'm'
+      state.current_signal.multiplex_value = std::stoi(value);
+    } catch (const std::exception&) {
+      // Handle conversion error
+      state.current_signal.multiplex_value = 0;
+    }
     state.current_multiplex = in.string();
   }
 };
@@ -268,16 +277,20 @@ struct action<grammar::multiplexed> {
 template<>
 struct action<grammar::format> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     std::string format = in.string();
     
     // Byte order (0=Motorola/big-endian, 1=Intel/little-endian)
-    state.current_signal.byte_order = format[1] - '0';
+    if (format.length() > 1) {
+      state.current_signal.byte_order = format[1] - '0';
+    }
     
     // Sign (+=unsigned, -=signed)
-    state.current_signal.sign = (format[2] == '-') ? 
-                                SignType::kSigned : 
-                                SignType::kUnsigned;
+    if (format.length() > 2) {
+      state.current_signal.sign = (format[2] == '-') ? 
+                                  SignType::kSigned : 
+                                  SignType::kUnsigned;
+    }
   }
 };
 
@@ -285,16 +298,23 @@ struct action<grammar::format> {
 template<>
 struct action<grammar::factor_offset> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
-    std::string str = in.string();
-    size_t comma_pos = str.find(',');
-    
-    // Extract factor and offset, stripping parentheses
-    std::string factor_str = str.substr(1, comma_pos - 1);
-    std::string offset_str = str.substr(comma_pos + 1, str.length() - comma_pos - 2);
-    
-    state.current_signal.factor = std::stod(factor_str);
-    state.current_signal.offset = std::stod(offset_str);
+  static void apply(const ActionInput& in, message_state& state) noexcept {
+    try {
+      std::string str = in.string();
+      size_t comma_pos = str.find(',');
+      if (comma_pos != std::string::npos) {
+        // Extract factor and offset, stripping parentheses
+        std::string factor_str = str.substr(1, comma_pos - 1);
+        std::string offset_str = str.substr(comma_pos + 1, str.length() - comma_pos - 2);
+        
+        state.current_signal.factor = std::stod(factor_str);
+        state.current_signal.offset = std::stod(offset_str);
+      }
+    } catch (const std::exception&) {
+      // Handle conversion error
+      state.current_signal.factor = 1.0;
+      state.current_signal.offset = 0.0;
+    }
   }
 };
 
@@ -302,16 +322,23 @@ struct action<grammar::factor_offset> {
 template<>
 struct action<grammar::min_max> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
-    std::string str = in.string();
-    size_t pipe_pos = str.find('|');
-    
-    // Extract min and max, stripping brackets
-    std::string min_str = str.substr(1, pipe_pos - 1);
-    std::string max_str = str.substr(pipe_pos + 1, str.length() - pipe_pos - 2);
-    
-    state.current_signal.minimum = std::stod(min_str);
-    state.current_signal.maximum = std::stod(max_str);
+  static void apply(const ActionInput& in, message_state& state) noexcept {
+    try {
+      std::string str = in.string();
+      size_t pipe_pos = str.find('|');
+      if (pipe_pos != std::string::npos) {
+        // Extract min and max, stripping brackets
+        std::string min_str = str.substr(1, pipe_pos - 1);
+        std::string max_str = str.substr(pipe_pos + 1, str.length() - pipe_pos - 2);
+        
+        state.current_signal.minimum = std::stod(min_str);
+        state.current_signal.maximum = std::stod(max_str);
+      }
+    } catch (const std::exception&) {
+      // Handle conversion error
+      state.current_signal.minimum = 0.0;
+      state.current_signal.maximum = 0.0;
+    }
   }
 };
 
@@ -319,7 +346,7 @@ struct action<grammar::min_max> {
 template<>
 struct action<common_grammar::quoted_string> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     // Use ParserBase method to unescape string
     state.current_signal.unit = ParserBase::UnescapeString(in.string());
   }
@@ -329,7 +356,7 @@ struct action<common_grammar::quoted_string> {
 template<>
 struct action<grammar::signal_def> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, message_state& state) {
+  static void apply(const ActionInput& in, message_state& state) noexcept {
     // Add the completed signal to the message
     state.message.signals.push_back(state.current_signal);
     

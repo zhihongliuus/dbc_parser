@@ -67,10 +67,14 @@ struct bit_timing_action : pegtl::nothing<Rule> {};
 template<>
 struct bit_timing_action<grammar::integer> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, bit_timing_state& state) {
+  static void apply(const ActionInput& in, bit_timing_state& state) noexcept {
     if (!state.baudrate_set) {
-      state.baudrate = std::stoi(in.string());
-      state.baudrate_set = true;
+      try {
+        state.baudrate = std::stoi(in.string());
+        state.baudrate_set = true;
+      } catch (const std::exception&) {
+        // Handle conversion error, leave baudrate_set as false
+      }
     }
   }
 };
@@ -79,10 +83,14 @@ struct bit_timing_action<grammar::integer> {
 template<>
 struct bit_timing_action<grammar::decimal> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, bit_timing_state& state) {
+  static void apply(const ActionInput& in, bit_timing_state& state) noexcept {
     if (!state.btr1_btr2_set) {
-      state.btr1_btr2 = std::stod(in.string());
-      state.btr1_btr2_set = true;
+      try {
+        state.btr1_btr2 = std::stod(in.string());
+        state.btr1_btr2_set = true;
+      } catch (const std::exception&) {
+        // Handle conversion error, leave btr1_btr2_set as false
+      }
     }
   }
 };
