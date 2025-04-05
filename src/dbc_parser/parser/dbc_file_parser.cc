@@ -337,28 +337,32 @@ struct dbc_state {
   std::string sig_group_content;
   std::string sig_mul_val_content;
   
+  // Constructor and destructor
+  dbc_state() noexcept = default;
+  ~dbc_state() noexcept = default;
+  
   // Methods to set section content
-  void set_version_content(const std::string& line) {
+  void set_version_content(const std::string& line) noexcept {
     version_content = line;
     current_section = SectionType::Version;
   }
   
-  void set_new_symbols_content(const std::string& line) {
+  void set_new_symbols_content(const std::string& line) noexcept {
     new_symbols_content = line;
     current_section = SectionType::NewSymbols;
   }
   
-  void set_nodes_content(const std::string& line) {
+  void set_nodes_content(const std::string& line) noexcept {
     nodes_content = line;
     current_section = SectionType::Nodes;
   }
   
-  void set_message_content(const std::string& line) {
+  void set_message_content(const std::string& line) noexcept {
     message_content = line;
     current_section = SectionType::Message;
   }
   
-  void set_message_transmitters_content(const std::string& line) {
+  void set_message_transmitters_content(const std::string& line) noexcept {
     // Extract only the part after BO_TX_BU_ and before the semicolon
     std::string content = line;
     size_t prefix_pos = content.find("BO_TX_BU_");
@@ -375,173 +379,173 @@ struct dbc_state {
     current_section = SectionType::MessageTransmitters;
   }
   
-  void set_bit_timing_content(const std::string& line) {
+  void set_bit_timing_content(const std::string& line) noexcept {
     bit_timing_content = line;
     current_section = SectionType::BitTiming;
   }
   
-  void set_value_table_content(const std::string& line) {
+  void set_value_table_content(const std::string& line) noexcept {
     value_table_content = line;
     current_section = SectionType::ValueTable;
   }
   
-  void set_env_var_content(const std::string& line) {
+  void set_env_var_content(const std::string& line) noexcept {
     env_var_content = line;
     current_section = SectionType::EnvVar;
   }
   
-  void set_env_var_data_content(const std::string& line) {
+  void set_env_var_data_content(const std::string& line) noexcept {
     env_var_data_content = line;
     current_section = SectionType::EnvVarData;
   }
   
-  void set_comment_content(const std::string& line) {
+  void set_comment_content(const std::string& line) noexcept {
     comment_content = line;
     current_section = SectionType::Comment;
   }
   
-  void set_attr_def_content(const std::string& line) {
+  void set_attr_def_content(const std::string& line) noexcept {
     attr_def_content = line;
     current_section = SectionType::AttrDef;
   }
   
-  void set_attr_def_def_content(const std::string& line) {
+  void set_attr_def_def_content(const std::string& line) noexcept {
     attr_def_def_content = line;
     current_section = SectionType::AttrDefDef;
   }
   
-  void set_attr_content(const std::string& line) {
+  void set_attr_content(const std::string& line) noexcept {
     attr_content = line;
     current_section = SectionType::Attr;
   }
   
-  void set_value_desc_content(const std::string& line) {
+  void set_value_desc_content(const std::string& line) noexcept {
     value_desc_content = line;
     current_section = SectionType::ValueDesc;
   }
   
-  void set_sig_val_type_content(const std::string& line) {
+  void set_sig_val_type_content(const std::string& line) noexcept {
     sig_val_type_content = line;
     current_section = SectionType::SigValType;
   }
   
-  void set_sig_group_content(const std::string& line) {
+  void set_sig_group_content(const std::string& line) noexcept {
     sig_group_content = line;
     current_section = SectionType::SigGroup;
   }
   
-  void set_sig_mul_val_content(const std::string& line) {
+  void set_sig_mul_val_content(const std::string& line) noexcept {
     sig_mul_val_content = line;
     current_section = SectionType::SigMulVal;
   }
   
   // Methods to add continuations to specific sections
-  void add_to_new_symbols(const std::string& line) {
+  void add_to_new_symbols(const std::string& line) noexcept {
     if (!new_symbols_content.empty()) {
       new_symbols_content += "\n";
     }
     new_symbols_content += line;
   }
   
-  void add_to_nodes(const std::string& line) {
+  void add_to_nodes(const std::string& line) noexcept {
     if (!nodes_content.empty()) {
       nodes_content += "\n";
     }
     nodes_content += line;
   }
   
-  void add_to_message(const std::string& line) {
+  void add_to_message(const std::string& line) noexcept {
     if (!message_content.empty()) {
       message_content += "\n";
     }
     message_content += line;
   }
   
-  void add_to_message_transmitters(const std::string& line) {
+  void add_to_message_transmitters(const std::string& line) noexcept {
     if (!message_transmitters_content.empty()) {
       message_transmitters_content += "\n";
     }
     message_transmitters_content += line;
   }
   
-  void add_to_bit_timing(const std::string& line) {
+  void add_to_bit_timing(const std::string& line) noexcept {
     if (!bit_timing_content.empty()) {
       bit_timing_content += "\n";
     }
     bit_timing_content += line;
   }
   
-  void add_to_value_table(const std::string& line) {
+  void add_to_value_table(const std::string& line) noexcept {
     if (!value_table_content.empty()) {
       value_table_content += "\n";
     }
     value_table_content += line;
   }
   
-  void add_to_env_var(const std::string& line) {
+  void add_to_env_var(const std::string& line) noexcept {
     if (!env_var_content.empty()) {
       env_var_content += "\n";
     }
     env_var_content += line;
   }
   
-  void add_to_env_var_data(const std::string& line) {
+  void add_to_env_var_data(const std::string& line) noexcept {
     if (!env_var_data_content.empty()) {
       env_var_data_content += "\n";
     }
     env_var_data_content += line;
   }
   
-  void add_to_comment(const std::string& line) {
+  void add_to_comment(const std::string& line) noexcept {
     if (!comment_content.empty()) {
       comment_content += "\n";
     }
     comment_content += line;
   }
   
-  void add_to_attr_def(const std::string& line) {
+  void add_to_attr_def(const std::string& line) noexcept {
     if (!attr_def_content.empty()) {
       attr_def_content += "\n";
     }
     attr_def_content += line;
   }
   
-  void add_to_attr_def_def(const std::string& line) {
+  void add_to_attr_def_def(const std::string& line) noexcept {
     if (!attr_def_def_content.empty()) {
       attr_def_def_content += "\n";
     }
     attr_def_def_content += line;
   }
   
-  void add_to_attr(const std::string& line) {
+  void add_to_attr(const std::string& line) noexcept {
     if (!attr_content.empty()) {
       attr_content += "\n";
     }
     attr_content += line;
   }
   
-  void add_to_value_desc(const std::string& line) {
+  void add_to_value_desc(const std::string& line) noexcept {
     if (!value_desc_content.empty()) {
       value_desc_content += "\n";
     }
     value_desc_content += line;
   }
   
-  void add_to_sig_val_type(const std::string& line) {
+  void add_to_sig_val_type(const std::string& line) noexcept {
     if (!sig_val_type_content.empty()) {
       sig_val_type_content += "\n";
     }
     sig_val_type_content += line;
   }
   
-  void add_to_sig_group(const std::string& line) {
+  void add_to_sig_group(const std::string& line) noexcept {
     if (!sig_group_content.empty()) {
       sig_group_content += "\n";
     }
     sig_group_content += line;
   }
   
-  void add_to_sig_mul_val(const std::string& line) {
+  void add_to_sig_mul_val(const std::string& line) noexcept {
     if (!sig_mul_val_content.empty()) {
       sig_mul_val_content += "\n";
     }

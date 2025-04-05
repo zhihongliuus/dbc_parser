@@ -35,6 +35,9 @@ struct DbcFile {
     int baudrate = 0;
     int btr1 = 0;
     int btr2 = 0;
+
+    BitTiming() noexcept = default;
+    ~BitTiming() noexcept = default;
   };
   std::optional<BitTiming> bit_timing;
   
@@ -51,6 +54,9 @@ struct DbcFile {
     int size = 0;
     std::string transmitter;
     std::vector<Signal> signals;
+
+    MessageDef() noexcept = default;
+    ~MessageDef() noexcept = default;
   };
   std::map<int, MessageDef> messages_detailed;
   
@@ -71,12 +77,18 @@ struct DbcFile {
     int ev_id = 0;
     std::string access_type;
     std::vector<std::string> access_nodes;
+
+    EnvVar() noexcept = default;
+    ~EnvVar() noexcept = default;
   };
   std::map<std::string, EnvVar> environment_variables;
   
   // ENVVAR_DATA_ : environment variable data
   struct EnvVarData {
     std::string data_name;
+
+    EnvVarData() = default;
+    ~EnvVarData() = default;
   };
   std::map<std::string, EnvVarData> environment_variable_data;
   
@@ -87,6 +99,9 @@ struct DbcFile {
     int object_id = 0;       // For Message
     int signal_index = 0;    // For Signal (within Message)
     std::string text;
+
+    CommentDef() noexcept = default;
+    ~CommentDef() noexcept = default;
   };
   std::vector<CommentDef> comments;
   
@@ -98,6 +113,9 @@ struct DbcFile {
     std::vector<std::string> enum_values; // For Enum type
     double min = 0.0;                    // For Int/Float
     double max = 0.0;                    // For Int/Float
+
+    AttributeDef() noexcept = default;
+    ~AttributeDef() noexcept = default;
   };
   std::vector<AttributeDef> attribute_definitions;
   
@@ -112,6 +130,9 @@ struct DbcFile {
     std::string signal_name;  // For Signal-specific
     std::string env_var_name; // For EnvVar-specific
     std::string value;
+
+    AttributeValue() noexcept = default;
+    ~AttributeValue() noexcept = default;
   };
   std::vector<AttributeValue> attribute_values;
   
@@ -125,6 +146,9 @@ struct DbcFile {
     int message_id = 0;
     std::string signal_name;
     std::map<int, std::string> values;
+
+    ValueDescription() noexcept = default;
+    ~ValueDescription() noexcept = default;
   };
   std::vector<ValueDescription> value_descriptions;
   
@@ -134,6 +158,9 @@ struct DbcFile {
     std::string multiplexor_name;
     std::string multiplexed_name;
     std::vector<std::pair<int, int>> multiplexor_ranges;
+
+    MultiplexedSignal() noexcept = default;
+    ~MultiplexedSignal() noexcept = default;
   };
   std::vector<MultiplexedSignal> multiplexed_signals;
   
@@ -143,6 +170,9 @@ struct DbcFile {
     std::string name;
     int repetitions = 1;
     std::vector<std::string> signal_names;
+
+    SignalGroupDef() noexcept = default;
+    ~SignalGroupDef() noexcept = default;
   };
   std::vector<SignalGroupDef> signal_groups;
   
@@ -151,8 +181,15 @@ struct DbcFile {
     int message_id = 0;
     std::string signal_name;
     int value_type = 0; // 0: Signed/Unsigned, 1: IEEE Float, 2: IEEE Double
+
+    SignalValueType() noexcept = default;
+    ~SignalValueType() noexcept = default;
   };
   std::vector<SignalValueType> signal_value_types;
+
+  // Main struct constructor/destructor
+  DbcFile() = default;
+  ~DbcFile() = default;
 };
 
 // Main parser class for DBC files

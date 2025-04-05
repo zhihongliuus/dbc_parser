@@ -73,6 +73,9 @@ struct Signal {
   std::optional<int> multiplex_value; // Multiplexer value if signal is multiplexed
   MultiplexType multiplex_type = MultiplexType::kNone; // Multiplexing type
   int multiplex_value_int = -1;       // Integer representation of multiplex_value
+
+  Signal() noexcept = default;
+  ~Signal() noexcept = default;
 };
 
 // Basic message structure
@@ -82,6 +85,9 @@ struct Message {
   int dlc = 0;                // Data Length Code (size in bytes)
   std::string sender;         // Sender node
   std::vector<Signal> signals;// Signals in the message
+
+  Message() noexcept = default;
+  ~Message() noexcept = default;
 };
 
 // Basic environment variable structure
@@ -95,12 +101,18 @@ struct EnvironmentVariable {
   int ev_id = 0;                       // Environment variable ID
   std::string access_type;             // Access type
   std::string access_nodes;            // Access nodes as string
+
+  EnvironmentVariable() noexcept = default;
+  ~EnvironmentVariable() noexcept = default;
 };
 
 // Environment variable data
 struct EnvironmentVariableData {
   std::string name;                    // Environment variable name
   std::string data;                    // Environment variable data
+
+  EnvironmentVariableData() noexcept = default;
+  ~EnvironmentVariableData() noexcept = default;
 };
 
 // Comment structure
@@ -113,17 +125,26 @@ struct Comment {
     std::pair<int, std::string>       // Message ID and signal name (SIGNAL)
   > identifier;
   std::string text;                    // Comment text
+
+  Comment() noexcept = default;
+  ~Comment() noexcept = default;
 };
 
 // Node structure
 struct Node {
   std::string name;                    // Node name
+
+  Node() noexcept = default;
+  ~Node() noexcept = default;
 };
 
 // Bit timing structure
 struct BitTiming {
   int baudrate;                        // Baud rate in kbit/s
   double btr1_btr2;                    // Combined BTR1 and BTR2 register values
+
+  BitTiming() noexcept = default;
+  ~BitTiming() noexcept = default;
 };
 
 // Enum to identify the type of object that a value description is associated with
@@ -136,11 +157,24 @@ enum class ValueDescriptionType {
 struct ValueTable {
   std::string name;                    // Value table name
   std::map<int, std::string> values;   // Values mapping
+
+  ValueTable() noexcept = default;
+  ~ValueTable() noexcept = default;
 };
 
 // Helper to convert common parser types to DBC file types
 class TypeConverter {
 public:
+  // Make class non-instantiable as it only contains static utility methods
+  TypeConverter() = delete;
+  ~TypeConverter() = delete;
+
+  // Prevent copying and moving
+  TypeConverter(const TypeConverter&) = delete;
+  TypeConverter& operator=(const TypeConverter&) = delete;
+  TypeConverter(TypeConverter&&) = delete;
+  TypeConverter& operator=(TypeConverter&&) = delete;
+
   // Convert Signal to various DbcFile signal formats
   // Add methods as needed for conversions between equivalent types
 };
