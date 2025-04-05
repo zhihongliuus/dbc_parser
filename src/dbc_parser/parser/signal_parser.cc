@@ -9,6 +9,8 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/parse_tree.hpp>
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -17,12 +19,12 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for parsing signals in DBC files.
 namespace grammar {
 
-// Whitespace handling
-struct ws : pegtl::star<pegtl::space> {};
-struct required_ws : pegtl::plus<pegtl::space> {};
-
-// Keyword for signals
-struct sg_prefix : pegtl::string<'S', 'G', '_'> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using required_ws = common_grammar::req_ws;
+using sg_prefix = common_grammar::sg_keyword;
+using colon = common_grammar::colon;
+using quoted_string = common_grammar::quoted_string;
 
 // Signal name
 struct signal_name : pegtl::identifier {};
@@ -31,9 +33,6 @@ struct signal_name : pegtl::identifier {};
 struct multiplexer : pegtl::one<'M'> {};
 struct multiplexed_by : pegtl::seq<pegtl::one<'m'>, pegtl::plus<pegtl::digit>> {};
 struct multiplexer_info : pegtl::sor<multiplexer, multiplexed_by, pegtl::success> {};
-
-// Colon separator
-struct colon : pegtl::one<':'> {};
 
 // Signal bit position and size
 struct digits : pegtl::plus<pegtl::digit> {};
@@ -77,11 +76,6 @@ struct range : pegtl::seq<
 > {};
 
 // Unit
-struct quoted_string : pegtl::seq<
-    pegtl::one<'"'>,
-    pegtl::star<pegtl::not_one<'"'>>,
-    pegtl::one<'"'>
-> {};
 struct unit : quoted_string {};
 
 // Receiving nodes
@@ -298,9 +292,16 @@ struct action<grammar::node_name> {
 };
 
 std::optional<Signal> SignalParser::Parse(std::string_view input) {
+  // Validate input using ParserBase method, but only check for empty
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
+  
   signal_state state;
   
-  pegtl::memory_input in(input.data(), input.size(), "");
+  // Create input for PEGTL parser
+  pegtl::memory_input<> in(input.data(), input.size(), "SG_");
+  
   try {
     pegtl::parse<grammar::signal_rule, action>(in, state);
   } catch (const pegtl::parse_error& e) {

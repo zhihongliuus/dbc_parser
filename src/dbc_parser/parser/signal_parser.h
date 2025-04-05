@@ -7,12 +7,13 @@
 #include <vector>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
 
 // Parser for SG_ entries in DBC files
-class SignalParser {
+class SignalParser : public ParserBase {
  public:
   // Parses a signal string and returns a Signal object if parsing is successful
   // Returns std::nullopt if parsing fails
