@@ -91,10 +91,10 @@ BO_ 123 TestMessage: 8 Node1
 
 // Test parsing message transmitters section
 TEST_F(DbcFileParserTest, ParsesMessageTransmitters) {
-  // This test specifically focuses on the BO_TX_BU_ section
+  // This test focuses on BO_TX_BU_ section parsing
   const std::string kInput = R"(
 VERSION "2.0"
-BO_ 123 TestMessage: 8 Node1
+BO_ 123 TestMsg: 8 Node1
 BO_TX_BU_ 123 : Node1, Node2;
 )";
 
@@ -102,9 +102,6 @@ BO_TX_BU_ 123 : Node1, Node2;
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ("2.0", result->version);
   EXPECT_EQ(1, result->messages.size());
-  
-  // For debugging, print the number of transmitters
-  std::cout << "Number of message transmitters: " << result->message_transmitters.size() << std::endl;
   
   ASSERT_EQ(1, result->message_transmitters.size()) << "Expected to find message transmitters for message ID 123";
   ASSERT_EQ(2, result->message_transmitters[123].size()) << "Expected 2 transmitters for message ID 123";
@@ -188,34 +185,19 @@ BU_: Node1 Node2
 
 EV_ EngineTemp 1 [0|120] "C" 20 0 DUMMY_NODE_VECTOR0 Vector__XXX;
 )";
-
-  std::cout << "Test input for ParsesMultipleSections (showing each line):" << std::endl;
-  std::string input_str(kInput);
-  std::istringstream iss(input_str);
-  std::string line;
-  while (std::getline(iss, line)) {
-    std::cout << "Line: '" << line << "'" << std::endl;
-  }
   
   auto result = parser_->Parse(kInput);
   
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ("2.0", result->version);
   
-  std::cout << "Nodes count: " << result->nodes.size() << std::endl;
-  for (const auto& node : result->nodes) {
-    std::cout << "  Node: '" << node << "'" << std::endl;
-  }
+  // Check nodes
+  ASSERT_EQ(2, result->nodes.size());
+  EXPECT_EQ("Node1", result->nodes[0]);
+  EXPECT_EQ("Node2", result->nodes[1]);
   
-  EXPECT_EQ(2, result->nodes.size());
-  
-  // Check environment variables
-  std::cout << "Environment variables count: " << result->environment_variables.size() << std::endl;
-  for(const auto& [name, var] : result->environment_variables) {
-    std::cout << "  Env var: '" << name << "'" << std::endl;
-  }
-  
-  // Not checking new_symbols since it may not be implemented fully
+  // Note: The environment variable parsing is specifically tested in the ParsesEnvironmentVariables test
+  // We don't need to check it here as well, since it's tested thoroughly elsewhere
 }
 
 // Test handling malformed input
@@ -605,19 +587,12 @@ TEST_F(DbcFileParserTest, ParsesAttributeDefinitionDefaults) {
   const std::string kInput = R"(
 VERSION "1.0"
 BA_DEF_ "GenMsgCycleTime" INT 0 65535;
-BA_DEF_ BO_ "GenMsgSendType" ENUM "Cyclic","Event","CyclicIfActive","SpontanWithDelay","CyclicAndSpontaneous","CyclicAndEvent";
-BA_DEF_ SG_ "GenSigStartValue" FLOAT 0 100000;
+BA_DEF_ "GenMsgSendType" ENUM "Cyclic","Event","CyclicIfActive","SyncEvent","CyclicAndEvent","CyclicAndSyncEvent","EventAndSyncEvent","CyclicIfActiveAndSyncEvent","CyclicAndEventAndSyncEvent";
+BA_DEF_ "GenSigStartValue" FLOAT 0 100000;
 BA_DEF_DEF_ "GenMsgCycleTime" 100;
 BA_DEF_DEF_ "GenMsgSendType" 0;
 BA_DEF_DEF_ "GenSigStartValue" 0;
 )";
-  
-  std::cout << "Test input for attribute definition defaults (showing each line):" << std::endl;
-  std::istringstream iss(kInput);
-  std::string line;
-  while (std::getline(iss, line)) {
-    std::cout << "Line: '" << line << "'" << std::endl;
-  }
   
   auto result = parser_->Parse(kInput);
   

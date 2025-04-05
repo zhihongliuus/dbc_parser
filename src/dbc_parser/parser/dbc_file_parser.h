@@ -87,8 +87,8 @@ struct DbcFile {
   struct EnvVarData {
     std::string data_name;
 
-    EnvVarData() = default;
-    ~EnvVarData() = default;
+    EnvVarData() noexcept = default;
+    ~EnvVarData() noexcept = default;
   };
   std::map<std::string, EnvVarData> environment_variable_data;
   

@@ -939,7 +939,6 @@ template<>
 struct action<grammar::attr_def_def_line> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
-    std::cout << "Setting attribute definition default content: '" << in.string() << "'" << std::endl;
     state.set_attr_def_def_content(in.string());
   }
 };
@@ -949,16 +948,11 @@ struct action<grammar::attr_def_def_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.attr_def_def_content.empty()) {
-      std::cout << "Original attribute definition default content: '" << state.attr_def_def_content << "'" << std::endl;
-      
       // Trim any trailing newlines and whitespace
       std::string content = StringUtilities::Trim(state.attr_def_def_content);
-      std::cout << "Cleaned attribute definition default content: '" << content << "'" << std::endl;
       
       auto attr_def_def_result = AttributeDefinitionDefaultParser::Parse(content);
       if (attr_def_def_result) {
-        std::cout << "Successfully parsed attribute definition default: " << attr_def_def_result->name << std::endl;
-        
         // Extract the default value based on its type
         std::string default_value_str;
         
@@ -971,16 +965,10 @@ struct action<grammar::attr_def_def_section> {
           default_value_str = std::get<std::string>(attr_def_def_result->default_value);
         }
         
-        std::cout << "Setting default value: " << attr_def_def_result->name << " = " << default_value_str << std::endl;
-        
         // Add the attribute default to the map
         state.dbc_file.attribute_defaults[attr_def_def_result->name] = default_value_str;
         state.found_valid_section = true;
-      } else {
-        std::cout << "Failed to parse attribute definition default" << std::endl;
       }
-    } else {
-      std::cout << "Empty attribute definition default content" << std::endl;
     }
   }
 };
@@ -999,11 +987,8 @@ struct action<grammar::comment_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.comment_content.empty()) {
-      std::cout << "Original comment content: '" << state.comment_content << "'" << std::endl;
-      
       // Trim any trailing newlines and whitespace
       std::string content = StringUtilities::Trim(state.comment_content);
-      std::cout << "Cleaned comment content: '" << content << "'" << std::endl;
       
       // Use the existing CommentParser
       auto comment_result = CommentParser::Parse(content);
@@ -1046,14 +1031,7 @@ struct action<grammar::comment_section> {
         // Add the comment to the list
         state.dbc_file.comments.push_back(comment_def);
         state.found_valid_section = true;
-        
-        std::cout << "Successfully parsed comment of type: " 
-                  << static_cast<int>(comment_def.type) << " with text: '" << comment_def.text << "'" << std::endl;
-      } else {
-        std::cout << "Failed to parse comment" << std::endl;
       }
-    } else {
-      std::cout << "Empty comment content" << std::endl;
     }
   }
 };
@@ -1128,7 +1106,6 @@ struct action<grammar::env_var_line> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
     state.set_env_var_content(in.string());
-    std::cout << "Setting environment variable content: '" << in.string() << "'" << std::endl;
   }
 };
 
@@ -1138,7 +1115,6 @@ struct action<grammar::env_var_data_line> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
     state.set_env_var_data_content(in.string());
-    std::cout << "Setting environment variable data content: '" << in.string() << "'" << std::endl;
   }
 };
 
@@ -1147,11 +1123,8 @@ struct action<grammar::env_var_data_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.env_var_data_content.empty()) {
-      std::cout << "Original environment variable data content: '" << state.env_var_data_content << "'" << std::endl;
-      
       // Trim any trailing newlines and whitespace
       std::string content = StringUtilities::Trim(state.env_var_data_content);
-      std::cout << "Cleaned environment variable data content: '" << content << "'" << std::endl;
       
       // Use the existing EnvironmentVariableDataParser
       auto env_var_data_result = EnvironmentVariableDataParser::Parse(content);
@@ -1163,14 +1136,8 @@ struct action<grammar::env_var_data_section> {
         
         // Store in the environment_variable_data map with name as the key
         state.dbc_file.environment_variable_data[env_var_data.data_name] = env_var_data;
-        std::cout << "Created environment variable data for: " << env_var_data.data_name << std::endl;
-        
         state.found_valid_section = true;
-      } else {
-        std::cout << "Failed to parse environment variable data" << std::endl;
       }
-    } else {
-      std::cout << "Empty environment variable data content" << std::endl;
     }
   }
 };
@@ -1218,13 +1185,9 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
         
         // Special handling for attribute definition defaults which may not be matched by our grammar
         if (line.find("BA_DEF_DEF_") != std::string::npos) {
-          std::cout << "Direct processing of BA_DEF_DEF_ line: " << line << std::endl;
-          
           // Try to parse using the dedicated parser
           auto attr_def_def_result = AttributeDefinitionDefaultParser::Parse(line);
           if (attr_def_def_result) {
-            std::cout << "Successfully parsed standalone attribute default: " << attr_def_def_result->name << std::endl;
-            
             // Extract the default value based on its type
             std::string default_value_str;
             
@@ -1237,8 +1200,6 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
               default_value_str = std::get<std::string>(attr_def_def_result->default_value);
             }
             
-            std::cout << "Setting direct standalone default value: " << attr_def_def_result->name << " = " << default_value_str << std::endl;
-            
             // Add the attribute default to the map
             state.dbc_file.attribute_defaults[attr_def_def_result->name] = default_value_str;
             state.found_valid_section = true;
@@ -1247,25 +1208,18 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
 
         // Direct processing of node definitions (BU_)
         if (line.find("BU_:") != std::string::npos || line.find("BU_: ") != std::string::npos) {
-          std::cout << "Direct processing of node line: " << line << std::endl;
-          
           // Try to parse using the dedicated parser
           auto nodes_result = NodesParser::Parse(line);
           if (nodes_result) {
-            std::cout << "Successfully parsed nodes line with " << nodes_result->size() << " nodes" << std::endl;
-            
             // Clear any existing nodes to avoid duplication
             state.dbc_file.nodes.clear();
             
             // Add all nodes to the result
             for (const auto& node : *nodes_result) {
-              std::cout << "  Adding node: " << node.name << std::endl;
               state.dbc_file.nodes.push_back(node.name);
             }
             
             state.found_valid_section = true;
-          } else {
-            std::cout << "Failed to parse BU_ line directly" << std::endl;
           }
         }
       }
@@ -1289,11 +1243,8 @@ struct action<grammar::env_var_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.env_var_content.empty()) {
-      std::cout << "Original environment variable content: '" << state.env_var_content << "'" << std::endl;
-      
       // Trim any trailing newlines and whitespace
       std::string content = StringUtilities::Trim(state.env_var_content);
-      std::cout << "Cleaned environment variable content: '" << content << "'" << std::endl;
       
       // Use the existing EnvironmentVariableParser
       auto env_var_result = EnvironmentVariableParser::Parse(content);
@@ -1316,13 +1267,7 @@ struct action<grammar::env_var_section> {
         // Store in the environment_variables map with name as the key
         state.dbc_file.environment_variables[env_var.name] = env_var;
         state.found_valid_section = true;
-        
-        std::cout << "Successfully parsed environment variable: " << env_var.name << std::endl;
-      } else {
-        std::cout << "Failed to parse environment variable" << std::endl;
       }
-    } else {
-      std::cout << "Empty environment variable content" << std::endl;
     }
   }
 };
@@ -1334,14 +1279,12 @@ struct action<grammar::any_line> {
   static void apply(const ActionInput& in, dbc_state& state) {
     std::string line = in.string();
     if (line.find("BA_DEF_DEF_") != std::string::npos) {
-      std::cout << "any_line: [" << line << "]" << std::endl;
-      
       // Detailed grammar rule debug
       bool starts_with_ws = std::regex_match(line, std::regex("^\\s+.*"));
       bool has_semicolon = line.find(';') != std::string::npos;
       bool ends_with_eol = line.find('\n') != std::string::npos || line.find('\r') != std::string::npos;
       
-      std::cout << "Grammar debug - starts_with_ws: " << starts_with_ws 
+      std::cerr << "Grammar debug - starts_with_ws: " << starts_with_ws 
                 << ", has_semicolon: " << has_semicolon 
                 << ", ends_with_eol: " << ends_with_eol << std::endl;
     }
@@ -1354,13 +1297,9 @@ struct action<grammar::direct_attr_def_def_line> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, dbc_state& state) {
     std::string line = in.string();
-    std::cout << "direct_attr_def_def_line matched: [" << line << "]" << std::endl;
-    
     // Try to parse using the dedicated parser
     auto attr_def_def_result = AttributeDefinitionDefaultParser::Parse(line);
     if (attr_def_def_result) {
-      std::cout << "Successfully parsed direct attribute default: " << attr_def_def_result->name << std::endl;
-      
       // Extract the default value based on its type
       std::string default_value_str;
       
@@ -1373,13 +1312,9 @@ struct action<grammar::direct_attr_def_def_line> {
         default_value_str = std::get<std::string>(attr_def_def_result->default_value);
       }
       
-      std::cout << "Setting direct default value: " << attr_def_def_result->name << " = " << default_value_str << std::endl;
-      
       // Add the attribute default to the map
       state.dbc_file.attribute_defaults[attr_def_def_result->name] = default_value_str;
       state.found_valid_section = true;
-    } else {
-      std::cout << "Failed to parse direct attribute definition default" << std::endl;
     }
   }
 };
@@ -1398,18 +1333,13 @@ struct action<grammar::attr_section> {
   template<typename ActionInput>
   static void apply(const ActionInput&, dbc_state& state) {
     if (!state.attr_content.empty()) {
-      std::cout << "Original attribute content: '" << state.attr_content << "'" << std::endl;
-      
       // Trim any trailing newlines and whitespace
       std::string content = StringUtilities::Trim(state.attr_content);
-      std::cout << "Cleaned attribute content: '" << content << "'" << std::endl;
       
       // Use the AttributeValueParser to parse the attribute value
       auto attr_value_result = AttributeValueParser::Parse(content);
       
       if (attr_value_result) {
-        std::cout << "Successfully parsed attribute value: " << attr_value_result->name << std::endl;
-        
         // Create DbcFile::AttributeValue from the parsed result
         DbcFile::AttributeValue attr_value;
         attr_value.attr_name = attr_value_result->name;
@@ -1464,13 +1394,7 @@ struct action<grammar::attr_section> {
         // Add the attribute value to the list
         state.dbc_file.attribute_values.push_back(attr_value);
         state.found_valid_section = true;
-        
-        std::cout << "Added attribute value: " << attr_value.attr_name << " = " << attr_value.value << std::endl;
-      } else {
-        std::cout << "Failed to parse attribute value" << std::endl;
       }
-    } else {
-      std::cout << "Empty attribute content" << std::endl;
     }
   }
 };

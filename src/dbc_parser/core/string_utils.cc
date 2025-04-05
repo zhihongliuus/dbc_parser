@@ -140,38 +140,41 @@ std::string StringUtils::ToLower(std::string_view str) {
 }
 
 std::optional<std::string> StringUtils::ExtractQuoted(std::string_view str) {
+  // Trim whitespace and check for basic quote structure
   str = Trim(str);
-  if (str.length() < 2 || str.front() != '"' || str.back() != '"') {
+  if (str.size() < 2 || str.front() != '"' || str.back() != '"') {
     return std::nullopt;
   }
-
-  // Special cases for some known format strings
-  if (str == "\"CANDB++ 1.0.123\"") {
-    return "CANDB++ 1.0.123";
-  }
-
-  // Skip the opening and closing quotes
+  
+  // Extract content between quotes
+  std::string_view content = str.substr(1, str.size() - 2);
+  
+  // Create result string
   std::string result;
-  result.reserve(str.length() - 2);
-
-  for (size_t i = 1; i < str.length() - 1; ++i) {
-    char c = str[i];
-    if (c == '\\' && i + 1 < str.length() - 1) {
-      char next = str[i + 1];
+  result.reserve(content.size());
+  
+  // Process character by character
+  for (size_t i = 0; i < content.size(); ++i) {
+    if (content[i] == '\\' && i + 1 < content.size()) {
+      // Handle escaped characters
+      char next = content[i + 1];
       if (next == '"' || next == '\\') {
-        result += next;  // Include escaped character
-        ++i;  // Skip the escaped character
+        // For escaped quotes or backslashes, include just the character
+        result.push_back(next);
+        ++i;  // Skip the next character
       } else {
-        result += c;  // Keep backslash for other characters
+        // For other escapes, keep the backslash and process normally
+        result.push_back('\\');
       }
-    } else if (c == '"') {
-      // Unescaped quote in the middle
+    } else if (content[i] == '"') {
+      // Unescaped quote in the middle is an error
       return std::nullopt;
     } else {
-      result += c;
+      // Normal character
+      result.push_back(content[i]);
     }
   }
-
+  
   return result;
 }
 
