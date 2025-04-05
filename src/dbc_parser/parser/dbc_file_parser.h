@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 
+#include "src/dbc_parser/parser/common_types.h"
 #include "src/dbc_parser/parser/message_parser.h"
 
 namespace dbc_parser {
@@ -116,8 +117,10 @@ struct DbcFile {
   
   // VAL_ : signal values
   struct ValueDescription {
+    // Type of value description (SIGNAL or ENV_VAR)
+    // For ENV_VAR type, message_id will be -1
     int message_id = 0;
-    std::string signal_name;
+    std::string signal_name;  // For ENV_VAR, this contains the environment variable name
     std::map<int, std::string> values;
   };
   std::vector<ValueDescription> value_descriptions;

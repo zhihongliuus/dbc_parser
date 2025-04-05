@@ -90,19 +90,21 @@ TEST(MessageParserTest, ParsesMessageWithMultiplexedSignals) {
   const auto& mode = result->signals[0];
   EXPECT_EQ(mode.name, "Mode");
   EXPECT_EQ(mode.multiplex_type, MultiplexType::kMultiplexor);
-  EXPECT_EQ(mode.multiplex_value, -1);  // Not applicable for multiplexor
+  EXPECT_FALSE(mode.multiplex_value.has_value());  // Not applicable for multiplexor
   
   // First multiplexed signal (m0)
   const auto& temp = result->signals[1];
   EXPECT_EQ(temp.name, "Temperature");
   EXPECT_EQ(temp.multiplex_type, MultiplexType::kMultiplexed);
-  EXPECT_EQ(temp.multiplex_value, 0);
+  EXPECT_TRUE(temp.multiplex_value.has_value());
+  EXPECT_EQ(temp.multiplex_value.value(), 0);
   
   // Second multiplexed signal (m1)
   const auto& rpm = result->signals[2];
   EXPECT_EQ(rpm.name, "RPM");
   EXPECT_EQ(rpm.multiplex_type, MultiplexType::kMultiplexed);
-  EXPECT_EQ(rpm.multiplex_value, 1);
+  EXPECT_TRUE(rpm.multiplex_value.has_value());
+  EXPECT_EQ(rpm.multiplex_value.value(), 1);
 }
 
 TEST(MessageParserTest, HandlesSignedSignals) {

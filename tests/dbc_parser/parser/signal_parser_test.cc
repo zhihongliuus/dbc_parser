@@ -35,7 +35,7 @@ TEST_F(SignalParserTest, ParsesBasicSignal) {
   EXPECT_EQ(result->unit, "km/h");
   EXPECT_THAT(result->receivers, ElementsAre("ECU1", "ECU2"));
   EXPECT_FALSE(result->is_multiplexer);
-  EXPECT_FALSE(result->multiplexed_by.has_value());
+  EXPECT_FALSE(result->multiplex_value.has_value());
 }
 
 TEST_F(SignalParserTest, ParsesUnsignedSignal) {
@@ -77,7 +77,7 @@ TEST_F(SignalParserTest, ParsesMultiplexerSignal) {
   
   EXPECT_EQ(result->name, "MuxSelector");
   EXPECT_TRUE(result->is_multiplexer);
-  EXPECT_FALSE(result->multiplexed_by.has_value());
+  EXPECT_FALSE(result->multiplex_value.has_value());
 }
 
 TEST_F(SignalParserTest, ParsesMultiplexedSignal) {
@@ -88,8 +88,8 @@ TEST_F(SignalParserTest, ParsesMultiplexedSignal) {
   
   EXPECT_EQ(result->name, "Temperature");
   EXPECT_FALSE(result->is_multiplexer);
-  EXPECT_TRUE(result->multiplexed_by.has_value());
-  EXPECT_EQ(result->multiplexed_by.value(), 2);
+  EXPECT_TRUE(result->multiplex_value.has_value());
+  EXPECT_EQ(result->multiplex_value.value(), 2);
 }
 
 TEST_F(SignalParserTest, HandlesWhitespace) {

@@ -1477,12 +1477,13 @@ struct action<grammar::value_desc_section> {
       auto value_desc_result = ValueDescriptionParser::Parse(content);
       
       if (value_desc_result) {
-        // Create a new value description and add it to the list
+        // Create a new value description for the DbcFile
         DbcFile::ValueDescription value_desc;
         
         // Set fields based on the description type
         if (std::holds_alternative<std::pair<int, std::string>>(value_desc_result->identifier)) {
           // For signal value descriptions, we need message ID and signal name
+          // These are stored in the identifier pair from ValueDescriptionParser
           const auto& id_pair = std::get<std::pair<int, std::string>>(value_desc_result->identifier);
           value_desc.message_id = id_pair.first;
           value_desc.signal_name = id_pair.second;
@@ -1496,17 +1497,19 @@ struct action<grammar::value_desc_section> {
           state.dbc_file.value_descriptions.push_back(value_desc);
           state.found_valid_section = true;
         } else if (std::holds_alternative<std::string>(value_desc_result->identifier)) {
-          // For environment variable value descriptions
+          // For environment variable value descriptions, the identifier
+          // from ValueDescriptionParser contains just the environment variable name
           const auto& env_var_name = std::get<std::string>(value_desc_result->identifier);
           
           // Create a value description for environment variable
           DbcFile::ValueDescription env_var_value_desc;
-          // Set env_var_name in a field of ValueDescription that can store it
-          // Typically this might be the signal_name field
+          
+          // Store env_var_name in the signal_name field
           env_var_value_desc.signal_name = env_var_name;
           
-          // Mark this as an environment variable value description by setting message_id to a special value
-          // For example, -1 could indicate this is for an environment variable
+          // Use special message_id (-1) to indicate this is for an environment variable
+          // This allows us to distinguish between signal and environment variable value descriptions
+          // while using the same ValueDescription structure
           env_var_value_desc.message_id = -1;
           
           // Copy the value descriptions map
