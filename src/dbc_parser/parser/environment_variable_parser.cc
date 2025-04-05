@@ -10,6 +10,8 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/parse_tree.hpp"
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -18,17 +20,12 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for EV_ (Environment Variable) parsing
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
-
-// EV_ keyword
-struct ev_keyword : pegtl::string<'E', 'V', '_'> {};
-
-// Integer
-struct integer : pegtl::seq<
-                   pegtl::opt<pegtl::one<'-'>>,
-                   pegtl::plus<pegtl::digit>
-                 > {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using integer = common_grammar::integer;
+using semicolon = common_grammar::semicolon;
+using ev_keyword = common_grammar::ev_keyword;
+using quoted_string = common_grammar::quoted_string;
 
 // Floating-point number
 struct decimal : pegtl::seq<
@@ -61,13 +58,6 @@ struct range : pegtl::seq<
                  close_bracket
                > {};
 
-// Unit string (may be quoted)
-struct quoted_string : pegtl::seq<
-                         pegtl::one<'"'>,
-                         pegtl::star<pegtl::not_one<'"'>>,
-                         pegtl::one<'"'>
-                       > {};
-
 struct unquoted_string : pegtl::plus<pegtl::not_one<' ', '\t', ';'>> {};
 
 struct unit_string : pegtl::sor<quoted_string, unquoted_string> {};
@@ -94,9 +84,6 @@ struct comma : pegtl::one<','> {};
 // List of node names
 struct node_list : pegtl::list_must<node_name, comma, pegtl::space> {};
 
-// Semicolon
-struct semicolon : pegtl::one<';'> {};
-
 // Complete EV_ rule
 struct ev_rule : pegtl::seq<
                    ws,
@@ -119,7 +106,7 @@ struct ev_rule : pegtl::seq<
                    pegtl::opt<node_list>, // access_nodes (optional)
                    ws,
                    semicolon,
-                   pegtl::eolf
+                   pegtl::eof
                  > {};
 
 } // namespace grammar
@@ -228,13 +215,12 @@ struct environment_variable_action<grammar::decimal> {
 
 // Action for extracting unit string
 template<>
-struct environment_variable_action<grammar::quoted_string> {
+struct environment_variable_action<common_grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, environment_variable_state& state) {
     if (!state.unit_set) {
-      // Remove quotes
-      std::string quoted = in.string();
-      state.unit = quoted.substr(1, quoted.length() - 2);
+      // Use ParserBase method to unescape string
+      state.unit = ParserBase::UnescapeString(in.string());
       state.unit_set = true;
     }
   }
@@ -276,8 +262,13 @@ struct environment_variable_action<grammar::node_list> {
 };
 
 std::optional<EnvironmentVariable> EnvironmentVariableParser::Parse(std::string_view input) {
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "EV_");
+  // Validate input using base class method
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
+  
+  // Create input for PEGTL parser using base class method
+  pegtl::memory_input<> in = CreateInput(input, "EV_");
   
   // Create state to collect results
   environment_variable_state state;

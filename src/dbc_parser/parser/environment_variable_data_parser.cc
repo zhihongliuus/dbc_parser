@@ -7,6 +7,8 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/parse_tree.hpp"
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -15,11 +17,12 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for ENVVAR_DATA_ (Environment Variable Data) parsing
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
-
-// ENVVAR_DATA_ keyword
-struct envvar_data_keyword : pegtl::string<'E', 'N', 'V', 'V', 'A', 'R', '_', 'D', 'A', 'T', 'A', '_'> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using integer = common_grammar::integer;
+using colon = common_grammar::colon;
+using semicolon = common_grammar::semicolon;
+using envvar_data_keyword = common_grammar::envvar_data_keyword;
 
 // Name (identifier)
 struct identifier : pegtl::plus<
@@ -30,15 +33,6 @@ struct identifier : pegtl::plus<
                         pegtl::one<'-'>
                       >
                     > {};
-
-// Data size (integer)
-struct integer : pegtl::plus<pegtl::digit> {};
-
-// Colon
-struct colon : pegtl::one<':'> {};
-
-// Semicolon
-struct semicolon : pegtl::one<';'> {};
 
 // Complete ENVVAR_DATA_ rule
 struct envvar_data_rule : pegtl::seq<
@@ -52,7 +46,7 @@ struct envvar_data_rule : pegtl::seq<
                             integer,     // data size
                             ws,
                             semicolon,
-                            pegtl::eolf
+                            pegtl::eof
                           > {};
 
 } // namespace grammar
@@ -83,8 +77,13 @@ struct environment_variable_data_action<grammar::identifier> {
 };
 
 std::optional<EnvironmentVariableData> EnvironmentVariableDataParser::Parse(std::string_view input) {
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "ENVVAR_DATA_");
+  // Validate input using base class method
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
+  
+  // Create input for PEGTL parser using base class method
+  pegtl::memory_input<> in = CreateInput(input, "ENVVAR_DATA_");
   
   // Create state to collect results
   environment_variable_data_state state;

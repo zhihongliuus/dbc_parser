@@ -94,7 +94,9 @@ cc_library(
     srcs = ["environment_variable_parser.cc"],
     hdrs = ["environment_variable_parser.h"],
     deps = [
+        ":common_grammar",
         ":common_types",
+        ":parser_base",
         "//src/dbc_parser/core:string_utils",
         "//third_party/pegtl:pegtl",
     ],
@@ -106,7 +108,9 @@ cc_library(
     srcs = ["environment_variable_data_parser.cc"],
     hdrs = ["environment_variable_data_parser.h"],
     deps = [
+        ":common_grammar",
         ":common_types",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

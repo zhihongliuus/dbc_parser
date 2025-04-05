@@ -70,6 +70,7 @@ struct ba_def_def_keyword : pegtl::string<'B', 'A', '_', 'D', 'E', 'F', '_', 'D'
 struct ba_keyword : pegtl::string<'B', 'A', '_'> {};
 struct val_keyword : pegtl::string<'V', 'A', 'L', '_'> {};
 struct val_table_keyword : pegtl::string<'V', 'A', 'L', '_', 'T', 'A', 'B', 'L', 'E', '_'> {};
+struct envvar_data_keyword : pegtl::string<'E', 'N', 'V', 'V', 'A', 'R', '_', 'D', 'A', 'T', 'A', '_'> {};
 
 // Punctuation used in several parsers
 struct colon : pegtl::one<':'> {};

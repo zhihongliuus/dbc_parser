@@ -6,12 +6,13 @@
 #include <string_view>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
 
 // Parser for the Environment Variable (EV_) section of a DBC file
-class EnvironmentVariableParser {
+class EnvironmentVariableParser : public ParserBase {
  public:
   // Parses an environment variable section from the given input
   // Returns std::nullopt if parsing fails
