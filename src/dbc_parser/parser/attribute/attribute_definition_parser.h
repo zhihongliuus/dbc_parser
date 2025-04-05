@@ -41,7 +41,7 @@ class AttributeDefinitionParser : public ParserBase {
   // BA_DEF_ SG_ "AttributeName" FLOAT 0 1; (Signal floating point attribute with range)
   // BA_DEF_ BO_ "AttributeName" STRING; (Message string attribute)
   // BA_DEF_ "AttributeName" ENUM "Val1","Val2","Val3"; (Enumeration attribute)
-  static std::optional<AttributeDefinition> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<AttributeDefinition> Parse(std::string_view input);
 };
 
 } // namespace parser

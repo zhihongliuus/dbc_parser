@@ -169,7 +169,7 @@ struct environment_variable_action : pegtl::nothing<Rule> {};
 template<>
 struct environment_variable_action<grammar::identifier> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
     if (!state.name_set) {
       state.name = in.string();
       state.name_set = true;
@@ -184,16 +184,20 @@ struct environment_variable_action<grammar::identifier> {
 template<>
 struct environment_variable_action<grammar::integer> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
-    if (!state.var_type_set) {
-      state.var_type = std::stoi(in.string());
-      state.var_type_set = true;
-    } else if (!state.initial_value_set) {
-      state.initial_value = std::stoi(in.string());
-      state.initial_value_set = true;
-    } else if (!state.ev_id_set) {
-      state.ev_id = std::stoi(in.string());
-      state.ev_id_set = true;
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
+    try {
+      if (!state.var_type_set) {
+        state.var_type = std::stoi(in.string());
+        state.var_type_set = true;
+      } else if (!state.initial_value_set) {
+        state.initial_value = std::stoi(in.string());
+        state.initial_value_set = true;
+      } else if (!state.ev_id_set) {
+        state.ev_id = std::stoi(in.string());
+        state.ev_id_set = true;
+      }
+    } catch (const std::exception&) {
+      // Handle number conversion errors gracefully
     }
   }
 };
@@ -202,13 +206,17 @@ struct environment_variable_action<grammar::integer> {
 template<>
 struct environment_variable_action<grammar::decimal> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
-    if (!state.minimum_set) {
-      state.minimum = std::stod(in.string());
-      state.minimum_set = true;
-    } else if (!state.maximum_set) {
-      state.maximum = std::stod(in.string());
-      state.maximum_set = true;
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
+    try {
+      if (!state.minimum_set) {
+        state.minimum = std::stod(in.string());
+        state.minimum_set = true;
+      } else if (!state.maximum_set) {
+        state.maximum = std::stod(in.string());
+        state.maximum_set = true;
+      }
+    } catch (const std::exception&) {
+      // Handle number conversion errors gracefully
     }
   }
 };
@@ -217,7 +225,7 @@ struct environment_variable_action<grammar::decimal> {
 template<>
 struct environment_variable_action<common_grammar::quoted_string> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
     if (!state.unit_set) {
       // Use ParserBase method to unescape string
       state.unit = ParserBase::UnescapeString(in.string());
@@ -229,7 +237,7 @@ struct environment_variable_action<common_grammar::quoted_string> {
 template<>
 struct environment_variable_action<grammar::unquoted_string> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
     if (!state.unit_set) {
       state.unit = in.string();
       state.unit_set = true;
@@ -241,7 +249,7 @@ struct environment_variable_action<grammar::unquoted_string> {
 template<>
 struct environment_variable_action<grammar::access_type> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
     if (!state.access_type_set) {
       state.access_type = in.string();
       state.access_type_set = true;
@@ -253,7 +261,7 @@ struct environment_variable_action<grammar::access_type> {
 template<>
 struct environment_variable_action<grammar::node_list> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_state& state) {
+  static void apply(const ActionInput& in, environment_variable_state& state) noexcept {
     if (!state.access_nodes_set) {
       state.access_nodes = in.string();
       state.access_nodes_set = true;

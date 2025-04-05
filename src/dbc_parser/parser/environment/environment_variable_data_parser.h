@@ -16,7 +16,7 @@ class EnvironmentVariableDataParser : public ParserBase {
  public:
   // Parses an environment variable data section from the given input
   // Returns std::nullopt if parsing fails
-  static std::optional<EnvironmentVariableData> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<EnvironmentVariableData> Parse(std::string_view input);
 };
 
 }  // namespace parser

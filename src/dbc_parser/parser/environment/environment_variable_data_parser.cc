@@ -68,7 +68,7 @@ struct environment_variable_data_action : pegtl::nothing<Rule> {};
 template<>
 struct environment_variable_data_action<grammar::identifier> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, environment_variable_data_state& state) {
+  static void apply(const ActionInput& in, environment_variable_data_state& state) noexcept {
     if (!state.name_set) {
       state.name = in.string();
       state.name_set = true;
