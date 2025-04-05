@@ -32,11 +32,6 @@ struct bo_type : pegtl::string<'B', 'O', '_'> {};
 struct sg_type : pegtl::string<'S', 'G', '_'> {};
 struct ev_type : pegtl::string<'E', 'V', '_'> {};
 
-// Identifiers
-struct node_name : pegtl::identifier {};
-struct env_var_name : pegtl::identifier {};
-struct signal_name : pegtl::identifier {};
-
 // Message ID - can be signed
 struct sign : pegtl::opt<pegtl::one<'-'>> {};
 struct digits : pegtl::plus<pegtl::digit> {};
@@ -52,6 +47,15 @@ struct quoted_string : pegtl::seq<
     pegtl::one<'"'>
 > {};
 
+// Identifiers - separate rules for quoted and unquoted
+struct unquoted_identifier : pegtl::identifier {};
+struct quoted_identifier : quoted_string {};
+
+// Node, signal, and environment variable names can be either quoted or unquoted
+struct node_name : pegtl::sor<quoted_identifier, unquoted_identifier> {};
+struct env_var_name : pegtl::sor<quoted_identifier, unquoted_identifier> {};
+struct signal_name : pegtl::sor<quoted_identifier, unquoted_identifier> {};
+
 // Semicolon
 struct semicolon : pegtl::one<';'> {};
 
@@ -64,8 +68,8 @@ struct network_comment : pegtl::seq<
 
 struct node_comment : pegtl::seq<
     cm_prefix, ws,
-    bu_type, required_ws,
-    quoted_string, ws,
+    bu_type, ws,
+    node_name, ws,
     quoted_string, ws,
     semicolon
 > {};
@@ -80,17 +84,17 @@ struct message_comment : pegtl::seq<
 
 struct signal_comment : pegtl::seq<
     cm_prefix, ws,
-    sg_type, required_ws,
-    message_id, required_ws,
-    quoted_string, ws,
+    sg_type, ws,
+    message_id, ws,
+    signal_name, ws,
     quoted_string, ws,
     semicolon
 > {};
 
 struct env_var_comment : pegtl::seq<
     cm_prefix, ws,
-    ev_type, required_ws,
-    quoted_string, ws,
+    ev_type, ws,
+    env_var_name, ws,
     quoted_string, ws,
     semicolon
 > {};
@@ -178,34 +182,8 @@ struct action<grammar::quoted_string> {
   static void apply(const ActionInput& in, CommentState& state) {
     std::string unescaped = UnescapeString(in.string());
     
-    if (state.is_first_quoted_string) {
-      switch (state.type) {
-        case CommentType::NETWORK:
-          // For NETWORK, the first string is the text
-          state.text = unescaped;
-          break;
-        case CommentType::NODE:
-        case CommentType::ENV_VAR:
-          // For NODE and ENV_VAR, the first string is the identifier
-          state.identifier = unescaped;
-          break;
-        case CommentType::MESSAGE:
-          // For MESSAGE, the first string is the comment text
-          state.text = unescaped;
-          break;
-        case CommentType::SIGNAL:
-          if (std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
-            // For SIGNAL, update the signal name in the pair
-            auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
-            pair.second = unescaped;
-          }
-          break;
-      }
-      state.is_first_quoted_string = false;
-    } else {
-      // For all types, the non-first string is always the comment text
-      state.text = unescaped;
-    }
+    // For all types, the quoted string is the comment text
+    state.text = unescaped;
   }
 };
 
@@ -250,24 +228,66 @@ struct action<grammar::ev_type> {
 };
 
 template<>
+struct action<grammar::node_name> : pegtl::nothing<grammar::node_name> {};
+
+template<>
+struct action<grammar::signal_name> : pegtl::nothing<grammar::signal_name> {};
+
+template<>
+struct action<grammar::env_var_name> : pegtl::nothing<grammar::env_var_name> {};
+
+template<>
 struct action<grammar::message_id> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, CommentState& state) {
     try {
       int id = std::stoi(in.string());
+      
       if (state.type == CommentType::MESSAGE) {
         state.identifier = id;
-      } else if (state.type == CommentType::SIGNAL) {
-        // For signal comments, create/update the pair with message ID
-        if (std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
-          auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
-          pair.first = id;
-        } else {
-          state.identifier = std::make_pair(id, "");
-        }
+      } else if (state.type == CommentType::SIGNAL && 
+                 std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
+        auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
+        pair.first = id;
       }
     } catch (const std::exception&) {
-      // If conversion fails, keep the default value
+      // Invalid message ID - we'll let the validation fail
+    }
+  }
+};
+
+template<>
+struct action<grammar::quoted_identifier> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, CommentState& state) {
+    std::string unescaped = UnescapeString(in.string());
+    
+    // Store the unquoted string based on the comment type
+    if (state.type == CommentType::NODE) {
+      state.identifier = unescaped;
+    } else if (state.type == CommentType::ENV_VAR) {
+      state.identifier = unescaped;
+    } else if (state.type == CommentType::SIGNAL && 
+               std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
+      auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
+      pair.second = unescaped;
+    }
+  }
+};
+
+template<>
+struct action<grammar::unquoted_identifier> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, CommentState& state) {
+    // Store the identifier string directly based on the comment type
+    if (state.type == CommentType::NODE) {
+      state.identifier = in.string();
+    } else if (state.type == CommentType::ENV_VAR) {
+      state.identifier = in.string();
+    } else if (state.type == CommentType::SIGNAL && 
+               std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
+      auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
+      pair.second = in.string();
     }
   }
 };
