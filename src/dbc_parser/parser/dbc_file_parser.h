@@ -8,8 +8,8 @@
 #include <vector>
 #include <unordered_map>
 
-#include "src/dbc_parser/parser/common_types.h"
-#include "src/dbc_parser/parser/message_parser.h"
+#include "src/dbc_parser/common/common_types.h"
+#include "src/dbc_parser/parser/message/message_parser.h"
 
 namespace dbc_parser {
 namespace parser {

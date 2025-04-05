@@ -1,14 +1,9 @@
-package(default_visibility = ["//visibility:public"])
-
 cc_library(
     name = "dbc_parser",
-    hdrs = glob(["**/*.h"], allow_empty = True),
-    srcs = glob(["**/*.cc"], allow_empty = True, exclude = ["**/*_test.cc"]),
-    copts = [
-        "-std=c++17",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/dbc_parser/common:common",
+        "//src/dbc_parser/core:string_utils",
+        "//src/dbc_parser/parser:parser",
     ],
-    strip_include_prefix = "src",
 ) 

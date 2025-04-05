@@ -15,4 +15,12 @@ cc_test(
         "-Werror",
     ],
     includes = ["../../src"],
+)
+
+test_suite(
+    name = "all_tests",
+    visibility = ["//visibility:public"],
+    tests = [
+        "//tests/dbc_parser/parser:parser_tests",
+    ],
 ) 
