@@ -7,12 +7,13 @@
 #include <vector>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
 
 // Parser for the Message (BO_) section of a DBC file
-class MessageParser {
+class MessageParser : public ParserBase {
  public:
   // Parses a message section from the given input
   // Returns std::nullopt if parsing fails

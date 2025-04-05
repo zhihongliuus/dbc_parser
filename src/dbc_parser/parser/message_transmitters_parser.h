@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "src/dbc_parser/parser/parser_base.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -16,7 +18,7 @@ struct MessageTransmitters {
 };
 
 // Parser for the Message Transmitters (BO_TX_BU_) section of a DBC file
-class MessageTransmittersParser {
+class MessageTransmittersParser : public ParserBase {
  public:
   // Parses a message transmitters section from the given input
   // Returns std::nullopt if parsing fails

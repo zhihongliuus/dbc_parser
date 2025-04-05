@@ -68,10 +68,11 @@ cc_library(
     srcs = ["message_parser.cc"],
     hdrs = ["message_parser.h"],
     deps = [
+        ":common_grammar",
         ":common_types",
-        "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        ":parser_base",
         ":signal_parser",
+        "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
 )
@@ -81,7 +82,9 @@ cc_library(
     srcs = ["message_transmitters_parser.cc"],
     hdrs = ["message_transmitters_parser.h"],
     deps = [
-        "//src/dbc_parser/core:string_utils",
+        ":common_grammar",
+        ":parser_base",
+        "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
 )

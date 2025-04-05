@@ -9,6 +9,8 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -17,20 +19,13 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for BO_ (Message) and SG_ (Signal) parsing
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
-
-// BO_ keyword
-struct bo_keyword : pegtl::string<'B', 'O', '_'> {};
-
-// SG_ keyword
-struct sg_keyword : pegtl::string<'S', 'G', '_'> {};
-
-// Integer
-struct integer : pegtl::seq<
-                   pegtl::opt<pegtl::one<'-'>>,
-                   pegtl::plus<pegtl::digit>
-                 > {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using quoted_string = common_grammar::quoted_string;
+using integer = common_grammar::integer;
+using colon = common_grammar::colon;
+using bo_keyword = common_grammar::bo_keyword;
+using sg_keyword = common_grammar::sg_keyword;
 
 // Float
 struct floating_point : pegtl::seq<
@@ -43,9 +38,6 @@ struct floating_point : pegtl::seq<
                             >
                           >
                         > {};
-
-// Colon separator
-struct colon : pegtl::one<':'> {};
 
 // Valid identifier character
 struct id_char : pegtl::sor<
@@ -124,13 +116,6 @@ struct min_max : pegtl::seq<
                    floating_point,           // Max
                    pegtl::one<']'>
                  > {};
-
-// Signal unit: "unit"
-struct quoted_string : pegtl::seq<
-                         pegtl::one<'"'>,
-                         pegtl::star<pegtl::not_one<'"'>>,
-                         pegtl::one<'"'>
-                       > {};
 
 // Receiver nodes (comma-separated list)
 struct receiver_list : pegtl::list<
@@ -332,12 +317,11 @@ struct action<grammar::min_max> {
 
 // Unit
 template<>
-struct action<grammar::quoted_string> {
+struct action<common_grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, message_state& state) {
-    std::string str = in.string();
-    // Strip quotes
-    state.current_signal.unit = str.substr(1, str.length() - 2);
+    // Use ParserBase method to unescape string
+    state.current_signal.unit = ParserBase::UnescapeString(in.string());
   }
 };
 
@@ -357,12 +341,13 @@ struct action<grammar::signal_def> {
 };
 
 std::optional<Message> MessageParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Validate input using base class method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
 
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "BO_");
+  // Create input for PEGTL parser using base class method
+  pegtl::memory_input<> in = CreateInput(input, "BO_");
   
   // Create state to collect results
   message_state state;

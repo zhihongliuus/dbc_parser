@@ -6,71 +6,114 @@
 #include <string_view>
 #include <vector>
 
+#include "tao/pegtl.hpp"
+#include "tao/pegtl/contrib/analyze.hpp"
+
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
+namespace pegtl = tao::pegtl;
+
+// Grammar rules for BO_TX_BU_ (Message Transmitters) parsing
+namespace grammar {
+
+// Use common grammar elements
+using ws = common_grammar::ws;
+using integer = common_grammar::integer;
+using colon = common_grammar::colon;
+using semicolon = common_grammar::semicolon;
+
+// BO_TX_BU_ keyword
+struct bo_tx_bu_keyword : pegtl::string<'B', 'O', '_', 'T', 'X', '_', 'B', 'U', '_'> {};
+
+// Valid identifier character
+struct id_char : pegtl::sor<
+                   pegtl::alpha,
+                   pegtl::digit,
+                   pegtl::one<'_'>,
+                   pegtl::one<'-'>
+                 > {};
+
+// Node name
+struct node_name : pegtl::plus<id_char> {};
+
+// Transmitter list (comma-separated)
+struct transmitter_list : pegtl::list<
+                            node_name,
+                            pegtl::one<','>,
+                            pegtl::space
+                          > {};
+
+// Complete BO_TX_BU_ rule
+struct bo_tx_bu_rule : pegtl::seq<
+                         ws,
+                         bo_tx_bu_keyword,
+                         ws,
+                         integer,            // Message ID
+                         ws,
+                         colon,
+                         ws,
+                         pegtl::opt<transmitter_list>,
+                         ws,
+                         pegtl::opt<semicolon>,
+                         ws,
+                         pegtl::eof
+                       > {};
+
+} // namespace grammar
+
+// Data structure to collect parsing results
+struct transmitters_state {
+  MessageTransmitters transmitters;
+};
+
+// PEGTL actions
+template<typename Rule>
+struct action : pegtl::nothing<Rule> {};
+
+// Message ID
+template<>
+struct action<grammar::integer> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, transmitters_state& state) {
+    state.transmitters.message_id = std::stoi(in.string());
+  }
+};
+
+// Node name (transmitter)
+template<>
+struct action<grammar::node_name> {
+  template<typename ActionInput>
+  static void apply(const ActionInput& in, transmitters_state& state) {
+    state.transmitters.transmitters.push_back(in.string());
+  }
+};
+
 std::optional<MessageTransmitters> MessageTransmittersParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Validate input using base class method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
+
+  // Create input for PEGTL parser using base class method
+  pegtl::memory_input<> in = CreateInput(input, "BO_TX_BU_");
   
-  std::string input_str(input);
-  std::istringstream iss(input_str);
-  std::string token;
+  // Create state to collect results
+  transmitters_state state;
   
-  // Parse BO_TX_BU_ keyword
-  iss >> token;
-  if (token != "BO_TX_BU_") {
-    return std::nullopt;
-  }
-  
-  // Parse message ID
-  iss >> token;
-  int message_id;
   try {
-    message_id = std::stoi(token);
-  } catch (...) {
-    return std::nullopt;
-  }
-  
-  // Parse colon
-  iss >> token;
-  if (token != ":") {
-    return std::nullopt;
-  }
-  
-  // Create result object
-  MessageTransmitters result;
-  result.message_id = message_id;
-  
-  // Parse transmitters (rest of the line)
-  std::string rest_of_line;
-  std::getline(iss, rest_of_line);
-  
-  // Remove trailing semicolon
-  if (!rest_of_line.empty() && rest_of_line.back() == ';') {
-    rest_of_line.pop_back();
-  }
-  
-  // Skip if the line is empty after removing the semicolon
-  if (rest_of_line.empty()) {
-    return result;  // No transmitters
-  }
-  
-  // Split the transmitter list by commas
-  std::istringstream transmitter_stream(rest_of_line);
-  std::string transmitter;
-  while (std::getline(transmitter_stream, transmitter, ',')) {
-    // Trim leading/trailing whitespace
-    transmitter.erase(0, transmitter.find_first_not_of(" \t\n\r\f\v"));
-    transmitter.erase(transmitter.find_last_not_of(" \t\n\r\f\v") + 1);
-    
-    if (!transmitter.empty()) {
-      result.transmitters.push_back(transmitter);
+    // Parse input using our grammar and actions
+    if (pegtl::parse<grammar::bo_tx_bu_rule, action>(in, state)) {
+      return state.transmitters;
     }
+  } catch (const pegtl::parse_error&) {
+    // Parse error - return nullopt
+    return std::nullopt;
   }
   
-  return result;
+  return std::nullopt;
 }
 
 }  // namespace parser
