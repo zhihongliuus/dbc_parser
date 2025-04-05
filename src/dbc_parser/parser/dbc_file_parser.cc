@@ -1495,6 +1495,28 @@ struct action<grammar::value_desc_section> {
           // Add to the DBC file
           state.dbc_file.value_descriptions.push_back(value_desc);
           state.found_valid_section = true;
+        } else if (std::holds_alternative<std::string>(value_desc_result->identifier)) {
+          // For environment variable value descriptions
+          const auto& env_var_name = std::get<std::string>(value_desc_result->identifier);
+          
+          // Create a value description for environment variable
+          DbcFile::ValueDescription env_var_value_desc;
+          // Set env_var_name in a field of ValueDescription that can store it
+          // Typically this might be the signal_name field
+          env_var_value_desc.signal_name = env_var_name;
+          
+          // Mark this as an environment variable value description by setting message_id to a special value
+          // For example, -1 could indicate this is for an environment variable
+          env_var_value_desc.message_id = -1;
+          
+          // Copy the value descriptions map
+          for (const auto& [val, desc] : value_desc_result->value_descriptions) {
+            env_var_value_desc.values[val] = desc;
+          }
+          
+          // Add to the same list as signal value descriptions
+          state.dbc_file.value_descriptions.push_back(env_var_value_desc);
+          state.found_valid_section = true;
         }
       }
     }
