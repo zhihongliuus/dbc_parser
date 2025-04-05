@@ -4,9 +4,13 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <iostream>
+#include <sstream>
 
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
+
+#include "src/dbc_parser/parser/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -16,14 +20,10 @@ namespace pegtl = tao::pegtl;
 // Grammar rules for NS_ (New Symbols) parsing
 namespace grammar {
 
-// Basic whitespace rule
-struct ws : pegtl::star<pegtl::space> {};
-
-// NS_ keyword
-struct ns_keyword : pegtl::string<'N', 'S', '_'> {};
-
-// Colon separator
-struct colon : pegtl::one<':'> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using ns_keyword = common_grammar::ns_keyword;
+using colon = common_grammar::colon;
 
 // A symbol (e.g., CM_, BA_, SG_, etc.)
 struct symbol : pegtl::seq<
@@ -34,9 +34,8 @@ struct symbol : pegtl::seq<
 // Multiple symbols separated by whitespace
 struct symbols : pegtl::star<
                    pegtl::seq<
-                     ws,
-                     symbol,
-                     pegtl::opt<ws>
+                     pegtl::plus<pegtl::space>,
+                     symbol
                    >
                  > {};
 
@@ -46,7 +45,7 @@ struct ns_rule : pegtl::seq<
                    ns_keyword,
                    ws,
                    colon,
-                   symbols,
+                   pegtl::opt<symbols>,
                    ws,
                    pegtl::eof
                  > {};
@@ -72,8 +71,13 @@ struct symbols_action<grammar::symbol> {
 };
 
 std::optional<NewSymbols> NewSymbolsParser::Parse(std::string_view input) {
+  // Validate input
+  if (!ValidateInput(input)) {
+    return std::nullopt;
+  }
+  
   // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "NS_");
+  pegtl::memory_input<> in = CreateInput(input, "NS_");
   
   // Create state to collect results
   symbols_state state;
@@ -81,9 +85,8 @@ std::optional<NewSymbols> NewSymbolsParser::Parse(std::string_view input) {
   try {
     // Parse input using our grammar and actions
     if (pegtl::parse<grammar::ns_rule, symbols_action>(in, state)) {
-      // Create and return NewSymbols object
       NewSymbols new_symbols;
-      new_symbols.symbols = std::move(state.symbols);
+      new_symbols.symbols = state.symbols;
       return new_symbols;
     }
   } catch (const pegtl::parse_error&) {

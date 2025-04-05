@@ -17,7 +17,8 @@ cc_library(
     srcs = ["new_symbols_parser.cc"],
     hdrs = ["new_symbols_parser.h"],
     deps = [
-        "//src/dbc_parser/core:string_utils",
+        ":common_grammar",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],
@@ -54,8 +55,9 @@ cc_library(
     srcs = ["value_table_parser.cc"],
     hdrs = ["value_table_parser.h"],
     deps = [
+        ":common_grammar",
         ":common_types",
-        "//src/dbc_parser/core:string_utils",
+        ":parser_base",
         "//third_party/pegtl:pegtl",
     ],
     visibility = ["//visibility:public"],

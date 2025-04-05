@@ -7,12 +7,13 @@
 #include <string_view>
 
 #include "src/dbc_parser/parser/common_types.h"
+#include "src/dbc_parser/parser/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
 
 // Parser for value table (VAL_TABLE_) in DBC files
-class ValueTableParser {
+class ValueTableParser : public ParserBase {
  public:
   // Parses a value table section from the given input and returns a ValueTable object
   // Returns std::nullopt if parsing fails

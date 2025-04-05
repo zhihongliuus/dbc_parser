@@ -8,6 +8,8 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
 
+#include "src/dbc_parser/parser/common_grammar.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -15,9 +17,11 @@ namespace pegtl = tao::pegtl;
 
 // Grammar rules for VAL_TABLE_ (Value Table) parsing
 namespace grammar {
-
-// VAL_TABLE_ keyword
-struct val_table_keyword : pegtl::string<'V', 'A', 'L', '_', 'T', 'A', 'B', 'L', 'E', '_'> {};
+// Use common grammar elements
+using ws = common_grammar::ws;
+using semicolon = common_grammar::semicolon;
+using quoted_string = common_grammar::quoted_string;
+using val_table_keyword = common_grammar::val_table_keyword;
 
 // Table name
 struct table_name_char : pegtl::sor<
@@ -35,13 +39,6 @@ struct integer : pegtl::seq<
                    pegtl::plus<pegtl::digit>
                  > {};
 
-// String description in double quotes
-struct quoted_string : pegtl::seq<
-                         pegtl::one<'"'>,
-                         pegtl::star<pegtl::not_one<'"'>>,
-                         pegtl::one<'"'>
-                       > {};
-
 // Value-description pair
 struct value_pair : pegtl::seq<
                       integer,
@@ -57,19 +54,16 @@ struct value_pairs : pegtl::star<
                        >
                      > {};
 
-// Semicolon at the end
-struct semicolon : pegtl::one<';'> {};
-
 // Complete VAL_TABLE_ rule
 struct val_table_rule : pegtl::seq<
-                          pegtl::opt<pegtl::star<pegtl::space>>,
+                          ws,
                           val_table_keyword,
                           pegtl::plus<pegtl::space>,
                           table_name,
                           value_pairs,
-                          pegtl::opt<pegtl::star<pegtl::space>>,
+                          ws,
                           semicolon,
-                          pegtl::opt<pegtl::star<pegtl::space>>,
+                          ws,
                           pegtl::eof
                         > {};
 
@@ -106,12 +100,11 @@ struct action<grammar::integer> {
 
 // Action for extracting string description
 template<>
-struct action<grammar::quoted_string> {
+struct action<common_grammar::quoted_string> {
   template<typename ActionInput>
   static void apply(const ActionInput& in, value_table_state& state) {
-    // Extract string without quotes
-    std::string quoted = in.string();
-    state.current_description = quoted.substr(1, quoted.length() - 2);
+    // Extract string without quotes using ParserBase method
+    state.current_description = ParserBase::UnescapeString(in.string());
     
     // Add the current value-description pair to the map
     state.value_table.values[state.current_value] = state.current_description;
@@ -119,12 +112,13 @@ struct action<grammar::quoted_string> {
 };
 
 std::optional<ValueTable> ValueTableParser::Parse(std::string_view input) {
-  if (input.empty()) {
+  // Validate input using base class method
+  if (!ValidateInput(input)) {
     return std::nullopt;
   }
 
-  // Create input for PEGTL parser
-  pegtl::memory_input<> in(input.data(), input.size(), "VAL_TABLE_");
+  // Create input for PEGTL parser using base class method
+  pegtl::memory_input<> in = CreateInput(input, "VAL_TABLE_");
   
   // Create state to collect results
   value_table_state state;

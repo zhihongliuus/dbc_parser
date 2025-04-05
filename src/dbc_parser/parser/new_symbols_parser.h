@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "src/dbc_parser/parser/parser_base.h"
+
 namespace dbc_parser {
 namespace parser {
 
@@ -15,7 +17,7 @@ struct NewSymbols {
 };
 
 // Parser for DBC NS_ (New Symbols) section
-class NewSymbolsParser {
+class NewSymbolsParser : public ParserBase {
  public:
   // Parses an NS_ string and returns a NewSymbols object if successful
   static std::optional<NewSymbols> Parse(std::string_view input);
