@@ -20,7 +20,7 @@ struct NewSymbols {
 class NewSymbolsParser : public ParserBase {
  public:
   // Parses an NS_ string and returns a NewSymbols object if successful
-  static std::optional<NewSymbols> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<NewSymbols> Parse(std::string_view input);
 };
 
 }  // namespace parser

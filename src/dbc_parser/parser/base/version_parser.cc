@@ -41,32 +41,21 @@ struct version_action : pegtl::nothing<Rule> {};
 template<>
 struct version_action<grammar::string_content> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, version_state& state) {
+  static void apply(const ActionInput& in, version_state& state) noexcept {
     std::string content = in.string();
     
-    // Process escape sequences
-    std::string processed;
-    processed.reserve(content.size());
-    
-    for (size_t i = 0; i < content.size(); ++i) {
-      if (content[i] == '\\' && i + 1 < content.size()) {
-        // Handle escape sequences
-        if (content[i+1] == '"' || content[i+1] == '\\') {
-          processed.push_back(content[i+1]);
-          ++i;  // Skip the escaped character
-        } else {
-          // Keep both backslash and character for other escapes
-          processed.push_back('\\');
-          processed.push_back(content[i+1]);
-          ++i;
-        }
-      } else {
-        processed.push_back(content[i]);
-      }
+    // Process escape sequences using the appropriate StringUtils method
+    // We're constructing a quoted string to use with ExtractQuoted
+    std::string quoted = "\"" + content + "\"";
+    auto extracted = core::StringUtils::ExtractQuoted(quoted);
+    if (extracted) {
+      state.content = *extracted;
+      state.success = true;
+    } else {
+      // Fallback if extraction fails
+      state.content = content;
+      state.success = true;
     }
-    
-    state.content = processed;
-    state.success = true;
   }
 };
 

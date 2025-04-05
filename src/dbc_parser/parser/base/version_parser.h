@@ -25,7 +25,7 @@ class VersionParser : public ParserBase {
    * @param input The input string to parse
    * @return An optional containing the Version object if successful, nullopt otherwise
    */
-  static std::optional<Version> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<Version> Parse(std::string_view input);
 };
 
 }  // namespace parser

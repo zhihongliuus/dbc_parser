@@ -17,12 +17,18 @@ class ParserState {
   ParserState() = default;
   virtual ~ParserState() = default;
 
+  // Prevent copying and moving
+  ParserState(const ParserState&) = delete;
+  ParserState& operator=(const ParserState&) = delete;
+  ParserState(ParserState&&) = delete;
+  ParserState& operator=(ParserState&&) = delete;
+
   /**
    * Get the result of parsing
    * 
    * @return std::optional<ResultType> The parse result if valid, nullopt otherwise
    */
-  virtual std::optional<ResultType> GetResult() const {
+  [[nodiscard]] virtual std::optional<ResultType> GetResult() const noexcept {
     if (is_complete_) {
       return result_;
     }

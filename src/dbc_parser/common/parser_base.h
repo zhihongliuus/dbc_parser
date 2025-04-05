@@ -22,7 +22,7 @@ class ParserBase {
    * @param quoted The quoted string to unescape
    * @return The unescaped string content without quotes
    */
-  static std::string UnescapeString(std::string_view quoted) {
+  [[nodiscard]] static std::string UnescapeString(std::string_view quoted) noexcept {
     if (quoted.size() < 2) return "";
     
     // Remove surrounding quotes
@@ -63,7 +63,7 @@ class ParserBase {
    * @param input The input string to validate
    * @return true if input is not empty, false otherwise
    */
-  static bool ValidateInput(std::string_view input) {
+  [[nodiscard]] static bool ValidateInput(std::string_view input) noexcept {
     return !input.empty();
   }
   
@@ -74,7 +74,8 @@ class ParserBase {
    * @param source_name A name for the input source (for error messages)
    * @return A PEGTL memory input object
    */
-  static pegtl::memory_input<> CreateInput(std::string_view input, const std::string& source_name) {
+  [[nodiscard]] static pegtl::memory_input<> CreateInput(
+      std::string_view input, const std::string& source_name) {
     return pegtl::memory_input<>(input.data(), input.size(), source_name);
   }
 };

@@ -17,7 +17,7 @@ class NodesParser : public ParserBase {
  public:
   // Parses a nodes section from the given input and returns a vector of Node objects
   // Returns std::nullopt if parsing fails
-  static std::optional<std::vector<Node>> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<std::vector<Node>> Parse(std::string_view input);
 };
 
 }  // namespace parser

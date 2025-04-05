@@ -16,7 +16,7 @@ class BitTimingParser : public ParserBase {
  public:
   // Parses a bit timing section from the given input and returns a BitTiming object
   // Returns std::nullopt if parsing fails
-  static std::optional<BitTiming> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<BitTiming> Parse(std::string_view input);
 };
 
 }  // namespace parser
