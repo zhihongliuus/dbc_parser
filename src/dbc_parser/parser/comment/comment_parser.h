@@ -18,7 +18,7 @@ class CommentParser : public ParserBase {
  public:
   // Parses a comment section from the given input and returns a Comment object
   // Returns std::nullopt if parsing fails
-  static std::optional<Comment> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<Comment> Parse(std::string_view input);
 };
 
 }  // namespace parser

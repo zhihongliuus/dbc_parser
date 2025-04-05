@@ -122,7 +122,7 @@ struct action : pegtl::nothing<Rule> {};
 template<>
 struct action<common_grammar::quoted_string> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, CommentState& state) {
+  static void apply(const ActionInput& in, CommentState& state) noexcept {
     std::string unescaped = ParserBase::UnescapeString(in.string());
     
     // For all types, the quoted string is the comment text
@@ -133,7 +133,7 @@ struct action<common_grammar::quoted_string> {
 template<>
 struct action<grammar::bu_type> {
   template<typename ActionInput>
-  static void apply(const ActionInput&, CommentState& state) {
+  static void apply(const ActionInput&, CommentState& state) noexcept {
     state.type = CommentType::NODE;
     state.identifier = std::string{};
   }
@@ -142,7 +142,7 @@ struct action<grammar::bu_type> {
 template<>
 struct action<grammar::bo_type> {
   template<typename ActionInput>
-  static void apply(const ActionInput&, CommentState& state) {
+  static void apply(const ActionInput&, CommentState& state) noexcept {
     state.type = CommentType::MESSAGE;
     state.identifier = 0;  // Default value, will be updated by message_id action
   }
@@ -151,7 +151,7 @@ struct action<grammar::bo_type> {
 template<>
 struct action<grammar::sg_type> {
   template<typename ActionInput>
-  static void apply(const ActionInput&, CommentState& state) {
+  static void apply(const ActionInput&, CommentState& state) noexcept {
     state.type = CommentType::SIGNAL;
     state.identifier = std::make_pair(0, "");  // Default value
   }
@@ -160,7 +160,7 @@ struct action<grammar::sg_type> {
 template<>
 struct action<grammar::ev_type> {
   template<typename ActionInput>
-  static void apply(const ActionInput&, CommentState& state) {
+  static void apply(const ActionInput&, CommentState& state) noexcept {
     state.type = CommentType::ENV_VAR;
     state.identifier = std::string{};
   }
@@ -169,7 +169,7 @@ struct action<grammar::ev_type> {
 template<>
 struct action<common_grammar::message_id> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, CommentState& state) {
+  static void apply(const ActionInput& in, CommentState& state) noexcept {
     try {
       int id = std::stoi(in.string());
       
@@ -181,7 +181,14 @@ struct action<common_grammar::message_id> {
         pair.first = id;
       }
     } catch (const std::exception&) {
-      // Invalid message ID - we'll let the validation fail
+      // Invalid message ID - we'll set a default value
+      if (state.type == CommentType::MESSAGE) {
+        state.identifier = 0;
+      } else if (state.type == CommentType::SIGNAL && 
+                 std::holds_alternative<std::pair<int, std::string>>(state.identifier)) {
+        auto& pair = std::get<std::pair<int, std::string>>(state.identifier);
+        pair.first = 0;
+      }
     }
   }
 };
@@ -189,7 +196,7 @@ struct action<common_grammar::message_id> {
 template<>
 struct action<common_grammar::quoted_identifier> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, CommentState& state) {
+  static void apply(const ActionInput& in, CommentState& state) noexcept {
     std::string unescaped = ParserBase::UnescapeString(in.string());
     
     // Store the unquoted string based on the comment type
@@ -208,7 +215,7 @@ struct action<common_grammar::quoted_identifier> {
 template<>
 struct action<common_grammar::unquoted_identifier> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, CommentState& state) {
+  static void apply(const ActionInput& in, CommentState& state) noexcept {
     // Store the identifier string directly based on the comment type
     if (state.type == CommentType::NODE) {
       state.identifier = in.string();

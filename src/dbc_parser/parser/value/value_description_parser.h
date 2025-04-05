@@ -38,7 +38,7 @@ class ValueDescriptionParser : public ParserBase {
   // Example formats:
   // VAL_ 123 SignalName 0 "Off" 1 "On" 2 "Error";
   // VAL_ EnvVarName 0 "Inactive" 1 "Active";
-  static std::optional<ValueDescription> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<ValueDescription> Parse(std::string_view input);
 };
 
 }  // namespace parser

@@ -97,12 +97,17 @@ struct action : pegtl::nothing<Rule> {};
 template<>
 struct action<grammar::message_id> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, value_description_state& state) {
+  static void apply(const ActionInput& in, value_description_state& state) noexcept {
     state.parsing_signal = true;
     state.result.type = ValueDescriptionType::SIGNAL;
     
     // Store message ID in state
-    state.temp_message_id = std::stoi(in.string());
+    try {
+      state.temp_message_id = std::stoi(in.string());
+    } catch (const std::exception&) {
+      // Default to 0 if conversion fails
+      state.temp_message_id = 0;
+    }
   }
 };
 
@@ -110,7 +115,7 @@ struct action<grammar::message_id> {
 template<>
 struct action<grammar::identifier> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, value_description_state& state) {
+  static void apply(const ActionInput& in, value_description_state& state) noexcept {
     std::string name = in.string();
     
     if (state.parsing_signal) {
@@ -128,7 +133,7 @@ struct action<grammar::identifier> {
 template<>
 struct action<grammar::quoted_string> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, value_description_state& state) {
+  static void apply(const ActionInput& in, value_description_state& state) noexcept {
     if (state.in_value_pair) {
       // This is a quoted string in a value-description pair
       std::string quoted = in.string();
@@ -149,11 +154,16 @@ struct action<grammar::quoted_string> {
 template<>
 struct action<grammar::integer_value> {
   template<typename ActionInput>
-  static void apply(const ActionInput& in, value_description_state& state) {
+  static void apply(const ActionInput& in, value_description_state& state) noexcept {
     // Check if we've already processed message ID and signal name
     if (state.result.identifier.index() != std::variant_npos) {
       // We're in a value-description pair
-      state.current_value = std::stoi(in.string());
+      try {
+        state.current_value = std::stoi(in.string());
+      } catch (const std::exception&) {
+        // Default to 0 if conversion fails
+        state.current_value = 0;
+      }
       state.in_value_pair = true;
     }
   }

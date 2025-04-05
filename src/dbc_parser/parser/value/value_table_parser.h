@@ -17,7 +17,7 @@ class ValueTableParser : public ParserBase {
  public:
   // Parses a value table section from the given input and returns a ValueTable object
   // Returns std::nullopt if parsing fails
-  static std::optional<ValueTable> Parse(std::string_view input);
+  [[nodiscard]] static std::optional<ValueTable> Parse(std::string_view input);
 };
 
 }  // namespace parser
