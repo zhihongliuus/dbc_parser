@@ -15,6 +15,8 @@
 #include <tao/pegtl/contrib/analyze.hpp>
 
 #include "dbc_parser/core/string_utils.h"
+#include "dbc_parser/core/logger.h"
+#include "dbc_parser/core/log_macros.h"
 #include "dbc_parser/parser/base/version_parser.h"
 #include "dbc_parser/parser/base/new_symbols_parser.h"
 #include "dbc_parser/parser/base/nodes_parser.h"
@@ -43,6 +45,7 @@ namespace pegtl = tao::pegtl;
 
 // Use string utilities from the core namespace
 using dbc_parser::core::StringUtils;
+using dbc_parser::core::Logger;
 
 // Helper for string operations
 class StringUtilities {
@@ -1144,15 +1147,28 @@ struct action<grammar::env_var_data_section> {
 
 // Main parser implementation
 std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
+  // Initialize logger if not already initialized
+  if (!Logger::GetLogger()) {
+    Logger::Initialize("info");
+    DBC_LOG_INFO_STR("DBC Parser initialized");
+  }
+
   // Empty input check
   if (input.empty()) {
+    DBC_LOG_ERROR_STR("Empty input provided to DBC parser");
     return std::nullopt;
   }
+  
+  std::stringstream debug_msg;
+  debug_msg << "Starting to parse DBC file of size: " << input.size();
+  DBC_LOG_DEBUG_STR(debug_msg.str());
   
   // Analyze grammar for potential issues
   if (const std::size_t issues = pegtl::analyze<grammar::dbc_file>()) {
     // We can still try to parse even if analysis shows issues
-    std::cerr << "Grammar analysis found " << issues << " issues" << std::endl;
+    std::stringstream warn_msg;
+    warn_msg << "Grammar analysis found " << issues << " issues";
+    DBC_LOG_WARN_STR(warn_msg.str());
   }
 
   try {
@@ -1164,10 +1180,11 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
     if (pegtl::parse<grammar::dbc_file, action>(in, state)) {
       // Handle invalid version format test
       if (state.invalid_version_format) {
+        DBC_LOG_ERROR_STR("Invalid VERSION format detected");
         return std::nullopt;
       }
       
-      // Direct processing of message transmitters since PEGTL grammar may not match them
+      // Direct processing of message transmitters
       std::string input_str(input);
       std::istringstream iss(input_str);
       std::string line;
@@ -1226,15 +1243,21 @@ std::optional<DbcFile> DbcFileParser::Parse(std::string_view input) {
       
       // Return result if we found at least one valid section
       if (state.found_valid_section) {
+        std::stringstream info_msg;
+        info_msg << "Successfully parsed DBC file with " << state.dbc_file.messages.size() << " messages";
+        DBC_LOG_INFO_STR(info_msg.str());
         return state.dbc_file;
       }
     }
   } catch (const pegtl::parse_error& e) {
     // Handle parsing errors with detailed information
-    std::cerr << "Parse error: " << e.what() << std::endl;
+    std::stringstream error_msg;
+    error_msg << "Parse error: " << e.what();
+    DBC_LOG_ERROR_STR(error_msg.str());
     return std::nullopt;
   }
 
+  DBC_LOG_ERROR_STR("No valid sections found in DBC file");
   return std::nullopt;
 }
 
@@ -1284,9 +1307,11 @@ struct action<grammar::any_line> {
       bool has_semicolon = line.find(';') != std::string::npos;
       bool ends_with_eol = line.find('\n') != std::string::npos || line.find('\r') != std::string::npos;
       
-      std::cerr << "Grammar debug - starts_with_ws: " << starts_with_ws 
+      std::stringstream debug_grammar_msg;
+      debug_grammar_msg << "Grammar debug - starts_with_ws: " << starts_with_ws 
                 << ", has_semicolon: " << has_semicolon 
-                << ", ends_with_eol: " << ends_with_eol << std::endl;
+                << ", ends_with_eol: " << ends_with_eol;
+      DBC_LOG_DEBUG_STR(debug_grammar_msg.str());
     }
   }
 };

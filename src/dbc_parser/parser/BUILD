@@ -10,6 +10,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
+        "//src/dbc_parser/core:logger",
         "//src/dbc_parser/parser/attribute:attribute",
         "//src/dbc_parser/parser/base:base",
         "//src/dbc_parser/parser/comment:comment",

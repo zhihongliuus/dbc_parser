@@ -7,7 +7,10 @@ cc_library(
 
 cc_library(
     name = "logger",
-    srcs = ["logger.cc"],
+    srcs = [
+        "logger.cc",
+        "log_functions.cc",
+    ],
     hdrs = [
         "logger.h",
         "log_macros.h",
