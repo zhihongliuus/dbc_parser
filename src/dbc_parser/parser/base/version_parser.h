@@ -11,19 +11,36 @@
 namespace dbc_parser {
 namespace parser {
 
-// Structure to hold Version information
+/**
+ * @brief Structure to hold DBC file version information.
+ *
+ * Represents the VERSION section of a DBC file, which specifies
+ * the version of the DBC file or the tool used to create it.
+ */
 struct Version {
-  std::string version;
+  std::string version;  ///< Version string from the DBC file
 };
 
-// Parser for DBC VERSION
+/**
+ * @brief Parser for the VERSION section in DBC files.
+ *
+ * Handles parsing of the VERSION section, which typically appears at the beginning
+ * of a DBC file and specifies the version of the DBC file format or the tool
+ * used to create the file.
+ *
+ * Example DBC version format:
+ * VERSION "X.Y.Z"
+ */
 class VersionParser : public ParserBase {
  public:
   /**
-   * Parses a VERSION string and returns a Version object if successful
+   * @brief Parses a VERSION section from the given input string.
    * 
-   * @param input The input string to parse
-   * @return An optional containing the Version object if successful, nullopt otherwise
+   * Takes a string containing a DBC VERSION section and parses it into a Version object.
+   * The parser validates the syntax and extracts the version string.
+   *
+   * @param input String view containing the VERSION section to parse
+   * @return std::optional<Version> A Version object if parsing succeeds, std::nullopt otherwise
    */
   [[nodiscard]] static std::optional<Version> Parse(std::string_view input);
 };

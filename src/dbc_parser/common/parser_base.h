@@ -12,15 +12,23 @@ namespace parser {
 namespace pegtl = tao::pegtl;
 
 /**
- * Base class for parsers with common functionality
+ * @brief Base class for all DBC file parsers.
+ *
+ * Provides common utilities and abstract interface for specific parser implementations.
+ * All parsers in the DBC Parser library inherit from this base class to maintain
+ * consistent behavior and interface.
  */
 class ParserBase {
  public:
   /**
-   * Utility to unescape quoted string content
+   * @brief Unescapes a quoted string by processing escape sequences.
+   *
+   * Handles escape sequences like \" and \\ in quoted strings and returns the 
+   * content without surrounding quotes. The function assumes that the input 
+   * string includes the surrounding quotes.
    * 
-   * @param quoted The quoted string to unescape
-   * @return The unescaped string content without quotes
+   * @param quoted The quoted string to unescape (including quotes)
+   * @return std::string The unescaped string content without quotes
    */
   [[nodiscard]] static std::string UnescapeString(std::string_view quoted) noexcept {
     if (quoted.size() < 2) return "";
@@ -48,31 +56,37 @@ class ParserBase {
 
  protected:
   /**
-   * Constructor is protected since this is a base class
+   * @brief Default constructor is protected since this is a base class.
+   *
+   * Prevents direct instantiation of the ParserBase class.
    */
   ParserBase() = default;
   
   /**
-   * Protected virtual destructor for proper cleanup in derived classes
+   * @brief Virtual destructor for proper cleanup in derived classes.
    */
   virtual ~ParserBase() = default;
   
   /**
-   * Protected helper method to validate that input is not empty
+   * @brief Validates that input is not empty.
+   *
+   * A basic validation step common to all parsers to ensure they have content to parse.
    * 
    * @param input The input string to validate
-   * @return true if input is not empty, false otherwise
+   * @return bool true if input is not empty, false otherwise
    */
   [[nodiscard]] static bool ValidateInput(std::string_view input) noexcept {
     return !input.empty();
   }
   
   /**
-   * Protected helper method to create a PEGTL memory input
+   * @brief Creates a PEGTL memory input object for parsing.
+   *
+   * Wraps the input string in a PEGTL memory input that can be used with PEGTL parsers.
    * 
    * @param input The input string to parse
-   * @param source_name A name for the input source (for error messages)
-   * @return A PEGTL memory input object
+   * @param source_name A name for the input source (for error reporting)
+   * @return pegtl::memory_input<> A PEGTL memory input object ready for parsing
    */
   [[nodiscard]] static pegtl::memory_input<> CreateInput(
       std::string_view input, const std::string& source_name) noexcept {
