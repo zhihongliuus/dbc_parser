@@ -80,7 +80,6 @@ The parser supports all standard signal formats and data types:
     - `environment/` - Environment variables
     - `message/` - CAN message definitions
     - `value/` - Signal value tables
-- `third_party/` - External dependency mappings
 - `tests/` - Test code
 
 ## Building
