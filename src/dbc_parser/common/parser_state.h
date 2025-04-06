@@ -7,7 +7,11 @@ namespace dbc_parser {
 namespace parser {
 
 /**
- * Base template class for parser state objects
+ * @brief Base template class for parser state objects.
+ * 
+ * This class provides a common interface for maintaining state during parsing operations.
+ * Parser state objects store intermediate and final results of parsing operations,
+ * and track whether parsing has been successfully completed.
  * 
  * @tparam ResultType The type of object returned by the parser
  */
@@ -24,9 +28,12 @@ class ParserState {
   ParserState& operator=(ParserState&&) = delete;
 
   /**
-   * Get the result of parsing
+   * @brief Get the result of parsing.
    * 
-   * @return std::optional<ResultType> The parse result if valid, nullopt otherwise
+   * Returns the parsed result if parsing has been successfully completed,
+   * or std::nullopt if parsing is incomplete or failed.
+   * 
+   * @return std::optional<ResultType> The parse result if valid, std::nullopt otherwise
    */
   [[nodiscard]] virtual std::optional<ResultType> GetResult() const noexcept {
     if (is_complete_) {
@@ -36,8 +43,8 @@ class ParserState {
   }
 
  protected:
-  ResultType result_{};
-  bool is_complete_ = false;
+  ResultType result_{};       ///< Stores the result of the parsing operation
+  bool is_complete_ = false;  ///< Indicates whether parsing has been successfully completed
 };
 
 }  // namespace parser

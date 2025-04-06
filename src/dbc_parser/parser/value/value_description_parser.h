@@ -13,31 +13,54 @@
 namespace dbc_parser {
 namespace parser {
 
-// Structure to hold value description data from DBC file
+/**
+ * @brief Represents value descriptions for signals or environment variables in a DBC file.
+ *
+ * Value descriptions map numeric values to human-readable string descriptions,
+ * providing meaningful interpretations for specific signal or environment variable values.
+ * These are defined in the VAL_ sections of DBC files.
+ */
 struct ValueDescription {
-  ValueDescriptionType type;   // Type of value description
+  ValueDescriptionType type;   ///< Type of value description (SIGNAL or ENV_VAR)
   
-  // Variant to hold the relevant identifiers based on value description type
-  // - For SIGNAL, both message id and signal name are stored
-  // - For ENV_VAR, the environment variable name is stored
+  /**
+   * @brief Identifier for the signal or environment variable
+   *
+   * This variant holds different types of identifiers depending on the value description type:
+   * - For SIGNAL type: std::pair<int, std::string> containing (message_id, signal_name)
+   * - For ENV_VAR type: std::string containing the environment variable name
+   */
   std::variant<
-    std::pair<int, std::string>,   // SIGNAL: (message_id, signal_name)
-    std::string                    // ENV_VAR: env_var_name
+    std::pair<int, std::string>,   ///< SIGNAL: (message_id, signal_name)
+    std::string                    ///< ENV_VAR: env_var_name
   > identifier;
   
-  // Map of integer values to their textual descriptions
-  std::map<int, std::string> value_descriptions;
+  std::map<int, std::string> value_descriptions;  ///< Map of integer values to their textual descriptions
 };
 
-// Parser for VAL_ entries in DBC files
+/**
+ * @brief Parser for value descriptions (VAL_) in DBC files.
+ *
+ * Handles parsing of value description entries, which map numeric values to
+ * human-readable string descriptions for signals or environment variables.
+ * These descriptions help interpret raw values in a more meaningful way.
+ *
+ * Example DBC value description formats:
+ * - VAL_ 123 "SignalName" 0 "Off" 1 "On" 2 "Error";     (Signal value description)
+ * - VAL_ "EnvVarName" 0 "Inactive" 1 "Active";          (Environment variable value description)
+ */
 class ValueDescriptionParser : public ParserBase {
  public:
-  // Parses a value description string and returns a ValueDescription object if parsing is successful
-  // Returns std::nullopt if parsing fails
-  //
-  // Example formats:
-  // VAL_ 123 SignalName 0 "Off" 1 "On" 2 "Error";
-  // VAL_ EnvVarName 0 "Inactive" 1 "Active";
+  /**
+   * @brief Parses a value description from the given input string.
+   *
+   * Takes a string containing a DBC VAL_ entry and parses it into a
+   * ValueDescription object. The parser validates the syntax and extracts
+   * the type, identifier, and mappings of values to descriptions.
+   *
+   * @param input String view containing the value description to parse
+   * @return std::optional<ValueDescription> A ValueDescription object if parsing succeeds, std::nullopt otherwise
+   */
   [[nodiscard]] static std::optional<ValueDescription> Parse(std::string_view input);
 };
 
