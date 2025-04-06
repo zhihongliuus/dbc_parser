@@ -6,7 +6,7 @@ A modern C++ parser for DBC (CAN database) files using PEGTL. This library allow
 
 - Modern C++17 implementation
 - Comprehensive test suite
-- Bazel build system
+- Bazel build system with Bzlmod dependency management
 - Uses PEGTL for efficient and maintainable parsing
 - Parses all standard DBC file sections
 - Clean API for working with parsed DBC data
@@ -64,10 +64,10 @@ The parser supports all standard signal formats and data types:
 
 ## Dependencies
 
-- Bazel 6.0+
+- Bazel 6.0+ with Bzlmod support
 - C++17 compatible compiler
-- googletest (for testing)
-- PEGTL (Parsing Expression Grammar Template Library)
+- googletest (for testing, automatically fetched via Bzlmod)
+- PEGTL (Parsing Expression Grammar Template Library, automatically fetched via Bzlmod)
 
 ## Project Structure
 
@@ -92,6 +92,15 @@ bazel build //...
 # Build just the parser library
 bazel build //src/dbc_parser:dbc_parser
 ```
+
+### Build System Notes
+
+This project uses Bazel's Module system (Bzlmod) for dependency management instead of the older WORKSPACE approach. Key benefits include:
+
+- Cleaner dependency management
+- Better reproducibility
+- More maintainable repository references
+- Improved version resolution
 
 ## Running Tests
 

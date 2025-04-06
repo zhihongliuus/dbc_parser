@@ -1,15 +1,13 @@
 ###############################################################################
-# MIGRATION TO BZLMOD
+# BZLMOD DEPENDENCY MANAGEMENT
 #
-# This project is in the process of migrating to Bzlmod for dependency management.
-# Currently, we're in a hybrid state where:
+# This project uses Bzlmod for dependency management.
+# The WORKSPACE file has been removed in favor of this MODULE.bazel file.
 #
-# 1. Dependencies are declared in both WORKSPACE (legacy) and MODULE.bazel (modern)
-# 2. BUILD files have been updated to use modern repository names (@googletest)
-#
-# The next steps in the migration:
-# - Test building without the WORKSPACE file
-# - Remove the WORKSPACE file entirely when all dependency issues are resolved
+# Key features:
+# - Dependencies are declared in a modular way
+# - Repository names are consistent (@googletest, @taocpp_pegtl)
+# - Better dependency resolution and management
 ###############################################################################
 
 module(
@@ -25,9 +23,6 @@ bazel_dep(name = "rules_python", version = "0.40.0")
 
 # For external repository management
 bazel_dep(name = "rules_foreign_cc", version = "0.9.0")
-
-# Make repositories directly accessible to build targets
-use_repo(googletest, "googletest")
 
 # Load repository rules
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
@@ -47,7 +42,4 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 """,
-)
-
-# Make the external repository accessible to build targets
-use_repo("taocpp_pegtl") 
+) 

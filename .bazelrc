@@ -1,1 +1,10 @@
-build --noenable_bzlmod --enable_workspace 
+# Enable Bzlmod for module-based external dependency management
+build --enable_bzlmod
+
+# Common build settings
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# Configuration for PEGTL
+# Add workspace-root-relative include paths to make includes shorter
+build --copt=-Isrc
