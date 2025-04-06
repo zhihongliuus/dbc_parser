@@ -16,7 +16,7 @@ cc_library(
         "//src/dbc_parser/parser/environment:environment",
         "//src/dbc_parser/parser/message:message",
         "//src/dbc_parser/parser/value:value",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 

@@ -6,7 +6,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 
@@ -18,7 +18,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 
@@ -30,7 +30,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 
@@ -42,7 +42,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 
@@ -54,7 +54,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 
@@ -66,7 +66,7 @@ cc_library(
     deps = [
         "//src/dbc_parser/common:common",
         "//src/dbc_parser/core:string_utils",
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 )
 

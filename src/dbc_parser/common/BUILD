@@ -10,6 +10,6 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//third_party/pegtl:pegtl",
+        "@taocpp_pegtl//:pegtl",
     ],
 ) 
