@@ -1,4 +1,4 @@
-#include "src/dbc_parser/parser/comment/comment_parser.h"
+#include "dbc_parser/parser/comment/comment_parser.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -11,7 +11,7 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/parse_tree.hpp>
 
-#include "src/dbc_parser/common/common_grammar.h"
+#include "dbc_parser/common/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {

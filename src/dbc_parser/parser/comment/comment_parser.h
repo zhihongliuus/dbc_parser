@@ -1,5 +1,5 @@
-#ifndef SRC_DBC_PARSER_PARSER_COMMENT_PARSER_H_
-#define SRC_DBC_PARSER_PARSER_COMMENT_PARSER_H_
+#ifndef DBC_PARSER_PARSER_COMMENT_PARSER_H_
+#define DBC_PARSER_PARSER_COMMENT_PARSER_H_
 
 #include <optional>
 #include <string>
@@ -7,8 +7,8 @@
 #include <utility>
 #include <variant>
 
-#include "src/dbc_parser/common/common_types.h"
-#include "src/dbc_parser/common/parser_base.h"
+#include "dbc_parser/common/common_types.h"
+#include "dbc_parser/common/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -24,4 +24,4 @@ class CommentParser : public ParserBase {
 }  // namespace parser
 }  // namespace dbc_parser
 
-#endif  // SRC_DBC_PARSER_PARSER_COMMENT_PARSER_H_ 
+#endif  // DBC_PARSER_PARSER_COMMENT_PARSER_H_ 

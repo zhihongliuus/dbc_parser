@@ -1,5 +1,5 @@
-#ifndef SRC_DBC_PARSER_PARSER_DBC_FILE_PARSER_H_
-#define SRC_DBC_PARSER_PARSER_DBC_FILE_PARSER_H_
+#ifndef DBC_PARSER_PARSER_DBC_FILE_PARSER_H_
+#define DBC_PARSER_PARSER_DBC_FILE_PARSER_H_
 
 #include <map>
 #include <optional>
@@ -8,8 +8,8 @@
 #include <vector>
 #include <unordered_map>
 
-#include "src/dbc_parser/common/common_types.h"
-#include "src/dbc_parser/parser/message/message_parser.h"
+#include "dbc_parser/common/common_types.h"
+#include "dbc_parser/parser/message/message_parser.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -212,4 +212,4 @@ class DbcFileParser {
 }  // namespace parser
 }  // namespace dbc_parser
 
-#endif  // SRC_DBC_PARSER_PARSER_DBC_FILE_PARSER_H_ 
+#endif  // DBC_PARSER_PARSER_DBC_FILE_PARSER_H_ 

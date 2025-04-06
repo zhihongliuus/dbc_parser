@@ -6,8 +6,8 @@
 #include <string_view>
 #include <variant>
 
-#include "src/dbc_parser/parser/attribute/attribute_definition_parser.h"
-#include "src/dbc_parser/common/parser_base.h"
+#include "dbc_parser/parser/attribute/attribute_definition_parser.h"
+#include "dbc_parser/common/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {

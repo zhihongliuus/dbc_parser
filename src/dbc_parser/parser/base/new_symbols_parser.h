@@ -1,12 +1,12 @@
-#ifndef SRC_DBC_PARSER_PARSER_NEW_SYMBOLS_PARSER_H_
-#define SRC_DBC_PARSER_PARSER_NEW_SYMBOLS_PARSER_H_
+#ifndef DBC_PARSER_PARSER_NEW_SYMBOLS_PARSER_H_
+#define DBC_PARSER_PARSER_NEW_SYMBOLS_PARSER_H_
 
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "src/dbc_parser/common/parser_base.h"
+#include "dbc_parser/common/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {
@@ -26,4 +26,4 @@ class NewSymbolsParser : public ParserBase {
 }  // namespace parser
 }  // namespace dbc_parser
 
-#endif  // SRC_DBC_PARSER_PARSER_NEW_SYMBOLS_PARSER_H_ 
+#endif  // DBC_PARSER_PARSER_NEW_SYMBOLS_PARSER_H_ 

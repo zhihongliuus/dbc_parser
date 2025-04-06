@@ -6,8 +6,8 @@
 #include <string_view>
 #include <vector>
 
-#include "src/dbc_parser/common/common_types.h"
-#include "src/dbc_parser/common/parser_base.h"
+#include "dbc_parser/common/common_types.h"
+#include "dbc_parser/common/parser_base.h"
 
 namespace dbc_parser {
 namespace parser {

@@ -1,4 +1,4 @@
-#include "src/dbc_parser/core/string_utils.h"
+#include "dbc_parser/core/string_utils.h"
 
 #include <algorithm>
 #include <cctype>

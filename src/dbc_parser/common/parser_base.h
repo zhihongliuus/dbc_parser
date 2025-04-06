@@ -1,5 +1,5 @@
-#ifndef SRC_DBC_PARSER_PARSER_PARSER_BASE_H_
-#define SRC_DBC_PARSER_PARSER_PARSER_BASE_H_
+#ifndef DBC_PARSER_PARSER_PARSER_BASE_H_
+#define DBC_PARSER_PARSER_PARSER_BASE_H_
 
 #include <optional>
 #include <string>
@@ -83,4 +83,4 @@ class ParserBase {
 }  // namespace parser
 }  // namespace dbc_parser
 
-#endif  // SRC_DBC_PARSER_PARSER_PARSER_BASE_H_ 
+#endif  // DBC_PARSER_PARSER_PARSER_BASE_H_ 

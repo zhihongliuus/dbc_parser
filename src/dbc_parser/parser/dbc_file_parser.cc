@@ -1,4 +1,4 @@
-#include "src/dbc_parser/parser/dbc_file_parser.h"
+#include "dbc_parser/parser/dbc_file_parser.h"
 
 #include <iostream>
 #include <string>
@@ -14,23 +14,23 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/analyze.hpp>
 
-#include "src/dbc_parser/core/string_utils.h"
-#include "src/dbc_parser/parser/base/version_parser.h"
-#include "src/dbc_parser/parser/base/new_symbols_parser.h"
-#include "src/dbc_parser/parser/base/nodes_parser.h"
-#include "src/dbc_parser/parser/message/message_parser.h"
-#include "src/dbc_parser/parser/message/message_transmitters_parser.h"
-#include "src/dbc_parser/parser/base/bit_timing_parser.h"
-#include "src/dbc_parser/parser/value/value_table_parser.h"
-#include "src/dbc_parser/parser/environment/environment_variable_parser.h"
-#include "src/dbc_parser/parser/environment/environment_variable_data_parser.h"
-#include "src/dbc_parser/parser/comment/comment_parser.h"
-#include "src/dbc_parser/parser/message/signal_value_type_parser.h"
-#include "src/dbc_parser/parser/message/signal_group_parser.h"
-#include "src/dbc_parser/parser/attribute/attribute_definition_parser.h"
-#include "src/dbc_parser/parser/attribute/attribute_definition_default_parser.h"
-#include "src/dbc_parser/parser/attribute/attribute_value_parser.h"
-#include "src/dbc_parser/parser/value/value_description_parser.h"
+#include "dbc_parser/core/string_utils.h"
+#include "dbc_parser/parser/base/version_parser.h"
+#include "dbc_parser/parser/base/new_symbols_parser.h"
+#include "dbc_parser/parser/base/nodes_parser.h"
+#include "dbc_parser/parser/message/message_parser.h"
+#include "dbc_parser/parser/message/message_transmitters_parser.h"
+#include "dbc_parser/parser/base/bit_timing_parser.h"
+#include "dbc_parser/parser/value/value_table_parser.h"
+#include "dbc_parser/parser/environment/environment_variable_parser.h"
+#include "dbc_parser/parser/environment/environment_variable_data_parser.h"
+#include "dbc_parser/parser/comment/comment_parser.h"
+#include "dbc_parser/parser/message/signal_value_type_parser.h"
+#include "dbc_parser/parser/message/signal_group_parser.h"
+#include "dbc_parser/parser/attribute/attribute_definition_parser.h"
+#include "dbc_parser/parser/attribute/attribute_definition_default_parser.h"
+#include "dbc_parser/parser/attribute/attribute_value_parser.h"
+#include "dbc_parser/parser/value/value_description_parser.h"
 
 
 // Only include parsers that are actually used in this file

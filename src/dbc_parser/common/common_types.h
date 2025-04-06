@@ -1,5 +1,5 @@
-#ifndef SRC_DBC_PARSER_PARSER_COMMON_TYPES_H_
-#define SRC_DBC_PARSER_PARSER_COMMON_TYPES_H_
+#ifndef DBC_PARSER_PARSER_COMMON_TYPES_H_
+#define DBC_PARSER_PARSER_COMMON_TYPES_H_
 
 #include <map>
 #include <optional>
@@ -182,4 +182,4 @@ public:
 }  // namespace parser
 }  // namespace dbc_parser
 
-#endif  // SRC_DBC_PARSER_PARSER_COMMON_TYPES_H_ 
+#endif  // DBC_PARSER_PARSER_COMMON_TYPES_H_ 

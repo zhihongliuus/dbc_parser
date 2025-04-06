@@ -1,4 +1,4 @@
-#include "src/dbc_parser/parser/value/value_table_parser.h"
+#include "dbc_parser/parser/value/value_table_parser.h"
 
 #include <map>
 #include <optional>
@@ -8,7 +8,7 @@
 #include "tao/pegtl.hpp"
 #include "tao/pegtl/contrib/analyze.hpp"
 
-#include "src/dbc_parser/common/common_grammar.h"
+#include "dbc_parser/common/common_grammar.h"
 
 namespace dbc_parser {
 namespace parser {
